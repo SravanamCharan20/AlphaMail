@@ -1,28 +1,33 @@
-import express from 'express';
+import express from "express";
 import { connectDB } from "./config/db.js";
-import dotenv from 'dotenv';
-import userAuthRouter from './routes/userAuthRouter.js';
+import dotenv from "dotenv";
+import userAuthRouter from "./routes/userAuthRouter.js";
 dotenv.config();
+import cookieParser from "cookie-parser";
+import cors from "cors";
 
+// CONSTANTS
 const app = express();
 const PORT = process.env.PORT || 9000;
 
+// Middlewares
+app.use(cookieParser());
+app.use(express.json());
+app.use(cors());
 
 // Routes
 // Production Health Checking Routes
-app.get('/health',(req,res) => {
-    res.send("Backend is Working")
-})
-app.get('/',(req,res) => {
-    res.send("Backend is Working")
-})
+app.get("/health", (req, res) => {
+  res.send("Backend is Working");
+});
+app.get("/", (req, res) => {
+  res.send("Backend is Working");
+});
 
 // Actual Routes
-app.use('/auth',userAuthRouter);
+app.use("/auth", userAuthRouter);
 
-
-
-
+// DB Connection
 connectDB(() => {
   console.log("DB Connection Successful..");
   app.listen(PORT, () => {
