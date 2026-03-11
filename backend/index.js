@@ -1,6 +1,7 @@
 import express from 'express';
 import { connectDB } from "./config/db.js";
 import dotenv from 'dotenv';
+import userAuthRouter from './routes/userAuthRouter.js';
 dotenv.config();
 
 const app = express();
@@ -17,6 +18,8 @@ app.get('/',(req,res) => {
 })
 
 // Actual Routes
+app.use('/auth',userAuthRouter);
+
 
 
 
