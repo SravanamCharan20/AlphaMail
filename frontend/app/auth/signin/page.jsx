@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import Link from 'next/link'
+import { useUser } from '../../utils/userContext';
 
 
 const Signin = () => {
@@ -13,6 +14,7 @@ const Signin = () => {
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
+  const {setUser} = useUser();
 
   const handleSubmit = async (e) => {
     setLoading(true);
@@ -32,6 +34,7 @@ const Signin = () => {
         throw new Error("Signup failed");
       }
       const data = await res.json();
+      setUser(data.user);
 
       setEmail("");
       setPassword("");
