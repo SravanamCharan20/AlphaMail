@@ -2,10 +2,14 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "../utils/userContext";
+import { API_BASE, apiFetch } from "../utils/api";
 
 const Navbar = () => {
   const { user, loading } = useUser();
   const [open, setOpen] = useState(false);
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [toast, setToast] = useState(null);
 
   const initials = useMemo(() => {
     if (!user?.username) return "U";
@@ -19,9 +23,8 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      const res = await fetch("http://localhost:9000/auth/logout", {
+      const res = await apiFetch("/auth/logout", {
         method: "POST", // important
-        credentials: "include", // sends cookies
       });
 
       window.location.reload();
@@ -30,11 +33,95 @@ const Navbar = () => {
     }
   };
 
+  const handleConnectMail = () => {
+    const url = `${API_BASE}/googleAuth/google`;
+    window.open(url, "_blank", "width=800,height=700");
+  };
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await apiFetch("/googleAuth/accounts");
+      if (!res.ok) {
+        setAccounts([]);
+        return;
+      }
+      const data = await res.json();
+      setAccounts(Array.isArray(data.accounts) ? data.accounts : []);
+    } catch (error) {
+      console.warn("Failed to load accounts:", error);
+      setAccounts([]);
+    }
+  };
+
+  useEffect(() => {
+    if (loading || !user) return;
+    fetchAccounts();
+  }, [loading, user]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3800);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "oauth-success") return;
+      const provider = event.data?.provider || "gmail";
+      const email = event.data?.email || "";
+      setToast({
+        title: "Account connected",
+        message: email
+          ? `${email} linked successfully.`
+          : `${provider} linked successfully.`,
+      });
+      fetchAccounts();
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+  
   if (loading && !user) return null;
 
   return (
     <nav className="w-full">
       <div className="mx-auto max-w-6xl rounded-2xl bg-white/90 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur px-4 py-3 sm:px-6 animate-[fadeUp_0.35s_ease-out]">
+        {toast && (
+          <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-emerald-200 bg-white shadow-[0_18px_50px_rgba(0,0,0,0.16)] p-4 animate-[fadeUp_0.25s_ease-out]">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-neutral-900">
+                  {toast.title}
+                </p>
+                <p className="text-xs text-neutral-500">{toast.message}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="ml-auto text-neutral-400 hover:text-neutral-700"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -112,7 +199,10 @@ const Navbar = () => {
               className="relative"
               tabIndex={0}
               onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                  setOpen(false);
+                  setAccountsOpen(false);
+                }
               }}
             >
               <button
@@ -126,7 +216,7 @@ const Navbar = () => {
               </button>
 
               <div
-                className={`absolute right-0 mt-3 w-56  origin-top-right rounded-2xl border border-neutral-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] transition-all duration-200 ${
+                className={`absolute right-0 mt-3 w-64 origin-top-right rounded-2xl border border-neutral-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] transition-all duration-200 ${
                   open
                     ? "scale-100 opacity-100 cursor-pointer translate-y-0"
                     : "pointer-events-none scale-95 opacity-0 -translate-y-1"
@@ -149,6 +239,59 @@ const Navbar = () => {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setAccountsOpen((prev) => !prev)}
+                    className="w-full px-4 py-2 text-left cursor-pointer text-sm text-neutral-700 hover:bg-neutral-50 flex items-center justify-between"
+                    aria-expanded={accountsOpen}
+                  >
+                    Accounts
+                    <span
+                      className={`text-neutral-400 transition-transform ${
+                        accountsOpen ? "rotate-180" : ""
+                      }`}
+                    >
+                      ▾
+                    </span>
+                  </button>
+                  <div
+                    className={`grid transition-all duration-200 ${
+                      accountsOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="px-4 pb-3 pt-1 space-y-2 max-h-48 overflow-auto pr-1">
+                        {accounts.length > 0 ? (
+                          accounts.map((account) => (
+                            <div
+                              key={account._id || `${account.provider}-${account.email}`}
+                              className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2"
+                            >
+                              <div className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 grid place-items-center text-xs font-semibold">
+                                {(account.provider || "G")
+                                  .toUpperCase()
+                                  .slice(0, 1)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-neutral-800 truncate">
+                                  {account.provider === "gmail"
+                                    ? "Gmail"
+                                    : account.provider}
+                                </p>
+                                <p className="text-[11px] text-neutral-500 truncate">
+                                  {account.email}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-neutral-500">
+                            No accounts connected yet.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
                     onClick={handleLogout}
                     className="w-full px-4 py-2 cursor-pointer text-left text-sm text-red-600 hover:bg-red-50"
                   >
@@ -160,6 +303,7 @@ const Navbar = () => {
 
             <button
               type="button"
+              onClick={handleConnectMail}
               className="h-11 w-11 rounded-full bg-blue-600 text-white grid place-items-center shadow-md shadow-blue-200"
             >
               <svg

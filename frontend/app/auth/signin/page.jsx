@@ -2,8 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState } from "react";
-import Link from 'next/link'
-import { useUser } from '../../utils/userContext';
+import Link from "next/link";
+import { useUser } from "../../utils/userContext";
+import { apiFetch } from "../../utils/api";
 
 
 const Signin = () => {
@@ -20,9 +21,8 @@ const Signin = () => {
   const handleSubmit = async (e) => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:9000/auth/signin", {
+      const res = await apiFetch("/auth/signin", {
         method: "POST",
-        credentials: "include",
         headers: {
           "content-type": "application/json",
         },

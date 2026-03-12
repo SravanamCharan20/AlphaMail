@@ -5,6 +5,7 @@ import userAuthRouter from "./routes/userAuthRouter.js";
 dotenv.config();
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import googleAuthRouter from "./routes/googleAuthRouter.js";
 
 // CONSTANTS
 const app = express();
@@ -13,9 +14,24 @@ const PORT = process.env.PORT || 9000;
 // Middlewares
 app.use(cookieParser());
 app.use(express.json());
+const isProd = process.env.NODE_ENV === "production";
+const allowedOrigin = process.env.CLIENT_ORIGIN || "http://localhost:3000";
+
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (origin === allowedOrigin) return callback(null, true);
+      if (!isProd) {
+        if (
+          origin.startsWith("http://localhost:") ||
+          origin.startsWith("http://127.0.0.1:")
+        ) {
+          return callback(null, true);
+        }
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
@@ -31,6 +47,7 @@ app.get("/", (req, res) => {
 
 // Actual Routes
 app.use("/auth", userAuthRouter);
+app.use('/googleAuth',googleAuthRouter)
 
 // DB Connection
 connectDB(() => {

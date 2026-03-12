@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from 'next/navigation';
-import Link from 'next/link'
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { apiFetch } from "../../utils/api";
 
 const Signup = () => {
   const [username, setUsername] = useState("");
@@ -17,9 +18,8 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:9000/auth/signup", {
+      const res = await apiFetch("/auth/signup", {
         method: "POST",
-        credentials: "include",
         headers: {
           "content-type": "application/json",
         },
