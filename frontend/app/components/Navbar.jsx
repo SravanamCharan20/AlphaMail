@@ -118,7 +118,7 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="h-11 w-11 rounded-full bg-neutral-100 text-neutral-700 grid place-items-center font-semibold ring-1 ring-neutral-200"
+                className="h-11 w-11 rounded-full cursor-pointer bg-neutral-100 text-neutral-700 grid place-items-center font-semibold ring-1 ring-neutral-200"
                 aria-haspopup="menu"
                 aria-expanded={open}
               >
@@ -126,9 +126,9 @@ const Navbar = () => {
               </button>
 
               <div
-                className={`absolute right-0 mt-3 w-56 origin-top-right rounded-2xl border border-neutral-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] transition-all duration-200 ${
+                className={`absolute right-0 mt-3 w-56  origin-top-right rounded-2xl border border-neutral-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] transition-all duration-200 ${
                   open
-                    ? "scale-100 opacity-100 translate-y-0"
+                    ? "scale-100 opacity-100 cursor-pointer translate-y-0"
                     : "pointer-events-none scale-95 opacity-0 -translate-y-1"
                 }`}
               >
@@ -143,14 +143,14 @@ const Navbar = () => {
                 <div className="border-t border-neutral-100 py-2">
                   <button
                     type="button"
-                    className="w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                    className="w-full px-4 py-2 text-left cursor-pointer text-sm text-neutral-700 hover:bg-neutral-50"
                   >
                     View profile
                   </button>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    className="w-full px-4 py-2 cursor-pointer text-left text-sm text-red-600 hover:bg-red-50"
                   >
                     Logout
                   </button>
