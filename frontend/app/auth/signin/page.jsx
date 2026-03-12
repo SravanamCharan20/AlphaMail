@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import Link from 'next/link'
 import { useUser } from '../../utils/userContext';
@@ -14,6 +14,7 @@ const Signin = () => {
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {setUser} = useUser();
 
   const handleSubmit = async (e) => {
@@ -31,7 +32,7 @@ const Signin = () => {
         }),
       });
       if (!res.ok) {
-        throw new Error("Signup failed");
+        throw new Error("Signin failed");
       }
       const data = await res.json();
       setUser(data.user);
@@ -41,7 +42,12 @@ const Signin = () => {
       setSuccess(data.message);
       setLoading(false);
 
-      router.push('/dashboard');
+      const nextPath = searchParams.get("next");
+      const safeNext =
+        nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+          ? nextPath
+          : "/dashboard";
+      router.push(safeNext);
     } catch (error) {
       console.log("Error:", error.message);
       setError("Something went wrong!!");

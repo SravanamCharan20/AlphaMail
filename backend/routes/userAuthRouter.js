@@ -2,6 +2,7 @@ import express from "express";
 import User from "../models/User.js";
 import dotenv from "dotenv";
 import userAuth from "../middlewares/auth.js";
+import jwt from "jsonwebtoken";
 dotenv.config();
 
 const userAuthRouter = express.Router();
@@ -126,4 +127,24 @@ userAuthRouter.get("/profile", userAuth, async (req, res) => {
     });
   }
 });
+
+userAuthRouter.get("/me", async (req, res) => {
+  try {
+    const token = req.cookies.token;
+
+    if (!token) {
+      return res.json({ user: null });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded._id).select("-password");
+
+    res.json({ user });
+  } catch (err) {
+    res.json({ user: null });
+  }
+});
+
+
 export default userAuthRouter;

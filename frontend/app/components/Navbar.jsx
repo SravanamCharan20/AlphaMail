@@ -4,31 +4,27 @@ import Link from "next/link";
 import { useUser } from "../utils/userContext";
 
 const Navbar = () => {
-  const { user, setUser } = useUser();
+  const { user, setUser, loading } = useUser();
 
   const handleLogout = async () => {
-    try {
-      await fetch("http://localhost:9000/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+    await fetch("http://localhost:9000/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
 
-      setUser(null);
-    } catch (error) {
-      console.error("Logout error:", error);
-    }
+    setUser(null);
   };
+
+  if (loading && !user) return null;
 
   return (
     <nav className="flex justify-between items-center px-8 py-4 bg-black text-white">
-      {/* Logo */}
       <Link href="/" className="text-xl font-bold">
         SigmaMail
       </Link>
 
-      {/* Right side */}
       <div className="flex items-center gap-4">
-        {!user && (
+        {!user ? (
           <>
             <Link
               href="/auth/signin"
@@ -44,11 +40,9 @@ const Navbar = () => {
               Sign Up
             </Link>
           </>
-        )}
-
-        {user && (
+        ) : (
           <>
-            <p className="font-medium">Welcome {user.username}</p>
+            <p>Welcome {user.username}</p>
 
             <Link
               href="/dashboard"
