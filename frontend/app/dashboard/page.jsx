@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import { useUser } from "../utils/userContext";
+import EmailSidebar from "./EmailSidebar/page";
 
 const Dashboard = () => {
   const router = useRouter();
@@ -21,7 +22,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ef_0%,_#f6f2ee_45%,_#efe7df_100%)]">
       <div className="px-4 sm:px-8 py-6">
         <Navbar />
-
+        <EmailSidebar/>
       </div>
     </div>
   );
