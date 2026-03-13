@@ -47,13 +47,13 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
         version: "v1",
         auth: oauth2Client,
       });
-      const list = await gmail.users.messages.list({
+      const list = await gmail.users.messages.list({ // -> 1Api Call
         userId: "me",
         maxResults: 10,
       });
 
       //   console.log(res.data.messages);
-      for (const msg of list.data.messages) {
+      for (const msg of list.data.messages) { // 10 -> API calls 
         const email = await gmail.users.messages.get({
           userId: "me",
           id: msg.id,
@@ -78,6 +78,8 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
         });
         cnt ++;
       }
+
+      // total calls are 11 * (connected accounts);
     }
     return res.status(200).json({
         emails,
