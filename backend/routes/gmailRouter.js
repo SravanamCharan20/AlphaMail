@@ -26,68 +26,68 @@ function getEmailBody(payload) {
 }
 
 gmailRouter.get("/messages", userAuth, async (req, res) => {
-  try {
-    const userId = req.user;
-
-    const userConnectedMails = await EmailAccount.find({ userId }).select(
-      "email accessToken refreshToken -_id"
-    );
-
-    const emails = [];
-    let cnt = 0;
-    // console.log(userConnectedMails);
-    for (const account of userConnectedMails) {
-      const oauth2Client = createOAuth2Client();
-      oauth2Client.setCredentials({
-        access_token: account.accessToken,
-        refresh_token: account.refreshToken,
-      });
-
-      const gmail = google.gmail({
-        version: "v1",
-        auth: oauth2Client,
-      });
-      const list = await gmail.users.messages.list({ // -> 1Api Call
-        userId: "me",
-        maxResults: 10,
-      });
-
-      //   console.log(res.data.messages);
-      for (const msg of list.data.messages) { // 10 -> API calls 
-        const email = await gmail.users.messages.get({
+    try {
+      const userId = req.user;
+  
+      const accounts = await EmailAccount.find({ userId })
+        .select("email accessToken refreshToken -_id");
+  
+      const emails = [];
+  
+      for (const account of accounts) {
+  
+        const oauth2Client = createOAuth2Client();
+  
+        oauth2Client.setCredentials({
+          access_token: account.accessToken,
+          refresh_token: account.refreshToken,
+        });
+  
+        const gmail = google.gmail({
+          version: "v1",
+          auth: oauth2Client,
+        });
+  
+        const threads = await gmail.users.threads.list({
           userId: "me",
-          id: msg.id,
+          maxResults: 10,
         });
-
-        const headers = email.data.payload.headers;
-
-        const subject = headers.find((h) => h.name === "Subject")?.value;
-        const from = headers.find((h) => h.name === "From")?.value;
-        const date = headers.find((h) => h.name === "Date")?.value;
-
-        // const payload = email.data.payload;
-        // const body = getEmailBody(payload);
-        // console.log("BODY : ",body);
-
-        emails.push({
-          account: account.email,
-          subject,
-          from,
-          date,
-          snippet: email.data.snippet,
-        });
-        cnt ++;
+  
+        for (const thread of threads.data.threads) {
+  
+          const threadData = await gmail.users.threads.get({
+            userId: "me",
+            id: thread.id,
+          });
+  
+          const message =
+            threadData.data.messages[threadData.data.messages.length - 1];
+  
+          const headers = message.payload.headers;
+  
+          const subject = headers.find(h => h.name === "Subject")?.value;
+          const from = headers.find(h => h.name === "From")?.value;
+          const date = headers.find(h => h.name === "Date")?.value;
+  
+          emails.push({
+            account: account.email,
+            subject,
+            from,
+            date,
+            snippet: message.snippet,
+          });
+  
+        }
       }
-
-      // total calls are 11 * (connected accounts);
-    }
-    return res.status(200).json({
+  
+      return res.status(200).json({
         emails,
-        count : cnt,
-    });
-  } catch (error) {
-    console.log(error.message);
-  }
-});
+        count: emails.length,
+      });
+  
+    } catch (error) {
+      console.log(error.message);
+    }
+  });
 
 export default gmailRouter;
