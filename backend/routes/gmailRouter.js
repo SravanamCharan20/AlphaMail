@@ -3,6 +3,8 @@ import { createOAuth2Client } from "./constants.js";
 import { google } from "googleapis";
 import userAuth from "../middlewares/auth.js";
 import EmailAccount from "../models/EmailAccount.js";
+import { emailQueue } from "../queues/emailQueue.js";
+import Email from "../models/Email.js";
 
 const gmailRouter = express.Router();
 
@@ -25,69 +27,28 @@ function getEmailBody(payload) {
   return null;
 }
 
-gmailRouter.get("/messages", userAuth, async (req, res) => {
-    try {
-      const userId = req.user;
-  
-      const accounts = await EmailAccount.find({ userId })
-        .select("email accessToken refreshToken -_id");
-  
-      const emails = [];
-  
-      for (const account of accounts) {
-  
-        const oauth2Client = createOAuth2Client();
-  
-        oauth2Client.setCredentials({
-          access_token: account.accessToken,
-          refresh_token: account.refreshToken,
-        });
-  
-        const gmail = google.gmail({
-          version: "v1",
-          auth: oauth2Client,
-        });
-  
-        const threads = await gmail.users.threads.list({
-          userId: "me",
-          maxResults: 10,
-        });
-  
-        for (const thread of threads.data.threads) {
-  
-          const threadData = await gmail.users.threads.get({
-            userId: "me",
-            id: thread.id,
-          });
-  
-          const message =
-            threadData.data.messages[threadData.data.messages.length - 1];
-  
-          const headers = message.payload.headers;
-  
-          const subject = headers.find(h => h.name === "Subject")?.value;
-          const from = headers.find(h => h.name === "From")?.value;
-          const date = headers.find(h => h.name === "Date")?.value;
-  
-          emails.push({
-            account: account.email,
-            subject,
-            from,
-            date,
-            snippet: message.snippet,
-          });
-  
-        }
-      }
-  
-      return res.status(200).json({
-        emails,
-        count: emails.length,
-      });
-  
-    } catch (error) {
-      console.log(error.message);
-    }
+// Adding Job into the emailQueue
+gmailRouter.post("/initial-sync", userAuth, async (req, res) => {
+  const userId = req.user;
+
+  // Adding JOB -> (jobName,data) into emailQueue
+  // Why JobName -> Queue can handle multiple jobs so in Worker if(job.name) == initial-sync-emails -> we do intialSync() like that
+  await emailQueue.add("initial-sync-emails", {
+    userId,
   });
+
+  res.status(200).json({ message: "Email sync started" });
+});
+
+gmailRouter.get("/messages", userAuth, async (req, res) => {
+  const userId = req.user;
+
+  const emails = await Email.find({ userId }).sort({ date: -1 }).limit(20);
+
+  res.json({
+    emails,
+    count: emails.length,
+  });
+});
 
 export default gmailRouter;

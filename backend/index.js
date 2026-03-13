@@ -54,7 +54,6 @@ app.use('/gmail',gmailRouter);
 
 // DB Connection
 connectDB(() => {
-  console.log("DB Connection Successful..");
   app.listen(PORT, () => {
     console.log(`server is running at ${PORT}`);
   });
