@@ -1,45 +1,77 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
+import { FaSpinner } from "react-icons/fa";
 import EmailCards from "./components/EmailCards";
 
 const EmailSidebar = () => {
   const [messages, setMessages] = useState([]);
-  const [msgsCount, setMsgsCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [count, setCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
-  const handleGetMsgs = async () => {
+  const fetchMessages = async () => {
+    const res = await fetch("http://localhost:9000/gmail/messages", {
+      credentials: "include",
+    });
+
+    const data = await res.json();
+
+    setMessages(data.emails);
+    setCount(data.count);
+  };
+
+  const handleSync = async () => {
     try {
-      setLoading(true);
+      setSyncing(true);
 
-      const res = await fetch("http://localhost:9000/gmail/messages", {
+      await fetch("http://localhost:9000/gmail/initial-sync", {
+        method: "POST",
         credentials: "include",
       });
 
-      const data = await res.json();
+      // start polling inbox
+      const interval = setInterval(fetchMessages, 2000);
 
-      setMessages(data.emails);
-      setMsgsCount(data.count);
+      // stop after 15 seconds
+      setTimeout(() => {
+        clearInterval(interval);
+        setSyncing(false);
+      }, 15000);
 
-      setLoading(false);
     } catch (error) {
       console.log(error.message);
-      setLoading(false);
+      setSyncing(false);
     }
   };
 
-  return (
-    <div className="border p-2 m-2 mt-12 w-1/4 min-h-screen">
-      <h1>Email Sidebar</h1>
-      <h2>No of messages : {msgsCount}</h2>
+  useEffect(() => {
+    fetchMessages();
+  }, []);
 
-      <button
-        className="p-2 rounded-lg bg-blue-500/70"
-        onClick={handleGetMsgs}
-      >
-        {loading ? "Loading..." : "Load Emails"}
-      </button>
+  return (
+    <div className="border p-3 m-2 mt-12 w-1/4 min-h-screen bg-white">
+
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="font-semibold text-lg">Inbox</h1>
+
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className={`flex items-center gap-2 px-3 py-1 rounded-md text-white transition
+            ${syncing ? "bg-gray-400 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"}`}
+        >
+          {syncing && <FaSpinner className="animate-spin" />}
+          {syncing ? "Syncing..." : "Sync"}
+        </button>
+      </div>
+
+      <p className="text-xs text-gray-500 mb-3">
+        Emails: {count}
+      </p>
 
       <EmailCards msgs={messages} />
+
     </div>
   );
 };
