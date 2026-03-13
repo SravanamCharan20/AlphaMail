@@ -6,6 +6,7 @@ dotenv.config();
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import googleAuthRouter from "./routes/googleAuthRouter.js";
+import gmailRouter from "./routes/gmailRouter.js";
 
 // CONSTANTS
 const app = express();
@@ -47,7 +48,9 @@ app.get("/", (req, res) => {
 
 // Actual Routes
 app.use("/auth", userAuthRouter);
-app.use('/googleAuth',googleAuthRouter)
+app.use("/googleAuth", googleAuthRouter);
+app.use('/gmail',gmailRouter);
+
 
 // DB Connection
 connectDB(() => {

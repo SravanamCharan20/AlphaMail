@@ -19,7 +19,7 @@ googleAuthRouter.get("/google", userAuth, async (req, res) => {
     }
 
     const oauth2Client = createOAuth2Client();
-    console.log("GOOGLE_REDIRECT_URI in use:", process.env.GOOGLE_REDIRECT_URI);
+    // console.log("GOOGLE_REDIRECT_URI in use:", process.env.GOOGLE_REDIRECT_URI);
 
     // create signed state so callback can trust userId
     const state = jwt.sign(
