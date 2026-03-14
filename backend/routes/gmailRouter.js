@@ -1,8 +1,5 @@
 import express from "express";
-import { createOAuth2Client } from "./constants.js";
-import { google } from "googleapis";
 import userAuth from "../middlewares/auth.js";
-import EmailAccount from "../models/EmailAccount.js";
 import { emailQueue } from "../queues/emailQueue.js";
 import Email from "../models/Email.js";
 

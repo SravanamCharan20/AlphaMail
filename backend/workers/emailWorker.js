@@ -10,8 +10,6 @@ const redisConnection = new IORedis({
   maxRetriesPerRequest: null,
 });
 
-
-
 await connectDB();
 console.log("Worker Started...");
 const worker = new Worker(
