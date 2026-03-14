@@ -19,7 +19,7 @@ const Dashboard = () => {
   if (loading || !user) return null;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ef_0%,_#f6f2ee_45%,_#efe7df_100%)]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff7ef_0%,#f6f2ee_45%,#efe7df_100%)]">
       <div className="px-4 sm:px-8 py-6">
         <Navbar />
         <EmailSidebar/>
