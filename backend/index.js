@@ -7,10 +7,15 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import googleAuthRouter from "./routes/googleAuthRouter.js";
 import gmailRouter from "./routes/gmailRouter.js";
+import http from 'http';
+import { initSocket } from "./config/socketServer.js";
 
 // CONSTANTS
 const app = express();
 const PORT = process.env.PORT || 9000;
+const server = http.createServer(app);
+initSocket(server);
+
 
 // Middlewares
 app.use(cookieParser());
@@ -54,7 +59,7 @@ app.use('/gmail',gmailRouter);
 
 // DB Connection
 connectDB(() => {
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`server is running at ${PORT}`);
   });
 });
