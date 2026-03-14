@@ -10,40 +10,36 @@ const EmailSidebar = () => {
   const [count, setCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
 
+  // Fetch initial emails from DB
   const fetchMessages = async () => {
-    const res = await fetch("http://localhost:9000/gmail/messages", {
-      credentials: "include",
-    });
+    try {
+      const res = await fetch("http://localhost:9000/gmail/messages", {
+        credentials: "include",
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    setMessages(data.emails);
-    setCount(data.count);
+      setMessages(data.emails);
+      setCount(data.count);
+    } catch (error) {
+      console.log("Fetch error:", error.message);
+    }
   };
 
+  // Trigger email sync
   const handleSync = async () => {
     try {
-      setSyncing(true);
-
       await fetch("http://localhost:9000/gmail/initial-sync", {
         method: "POST",
         credentials: "include",
       });
-
-      // start polling inbox
-      const interval = setInterval(fetchMessages, 2000);
-
-      // stop after 15 seconds
-      setTimeout(() => {
-        clearInterval(interval);
-        setSyncing(false);
-      }, 15000);
     } catch (error) {
-      console.log(error.message);
-      setSyncing(false);
+      console.log("Sync error:", error.message);
     }
   };
+
   useEffect(() => {
+    // Socket connection
     if (socket.connected) {
       console.log("Connected to socket:", socket.id);
     }
@@ -56,13 +52,34 @@ const EmailSidebar = () => {
       console.log("Socket disconnected");
     });
 
+    // Worker started syncing
+    socket.on("sync-start", () => {
+      setSyncing(true);
+    });
+
+    // New email received
+    socket.on("email-added", (email) => {
+      setMessages((prev) => [email, ...prev]);
+
+      setCount((prev) => prev + 1);
+    });
+
+    // Sync completed
+    socket.on("sync-complete", () => {
+      setSyncing(false);
+    });
+
+    // Cleanup listeners
     return () => {
       socket.off("connect");
       socket.off("disconnect");
+      socket.off("sync-start");
+      socket.off("email-added");
+      socket.off("sync-complete");
     };
   }, []);
 
-  
+  // Load cached emails when component mounts
   useEffect(() => {
     fetchMessages();
   }, []);
@@ -77,13 +94,14 @@ const EmailSidebar = () => {
           onClick={handleSync}
           disabled={syncing}
           className={`flex items-center gap-2 px-3 py-1 rounded-md text-white transition
-            ${
-              syncing
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600"
-            }`}
+          ${
+            syncing
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600"
+          }`}
         >
           {syncing && <FaSpinner className="animate-spin" />}
+
           {syncing ? "Syncing..." : "Sync"}
         </button>
       </div>

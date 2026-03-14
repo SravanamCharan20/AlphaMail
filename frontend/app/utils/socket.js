@@ -1,6 +1,7 @@
 import { io } from "socket.io-client";
+import { API_BASE } from "./api";
 
-const socket = io("http://localhost:9000", {
+const socket = io(API_BASE, {
   withCredentials: true,
 });
 

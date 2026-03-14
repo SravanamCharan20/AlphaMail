@@ -2,6 +2,8 @@ import { google } from "googleapis";
 import EmailAccount from "../models/EmailAccount.js";
 import Email from "../models/Email.js";
 import { createOAuth2Client } from "../routes/constants.js";
+import { publishSocketEvent } from "./socketPubSub.js";
+
 
 export const syncUserEmails = async (userId) => {
   try {
@@ -61,6 +63,17 @@ export const syncUserEmails = async (userId) => {
             userId,
           },
           { upsert: true }
+        );
+        await publishSocketEvent(
+          "email-added",
+          {
+            account: account.email,
+            subject,
+            from,
+            date,
+            snippet: message.snippet,
+          },
+          userId.toString()
         );
       }
     }

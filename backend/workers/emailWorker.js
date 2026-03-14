@@ -2,12 +2,15 @@ import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { syncUserEmails } from "../services/gmailService.js";
 import { connectDB } from "../config/db.js";
+import { publishSocketEvent } from "../services/socketPubSub.js";
 
 const redisConnection = new IORedis({
-    host: "127.0.0.1",
-    port: 6379,
-    maxRetriesPerRequest: null,
+  host: "127.0.0.1",
+  port: 6379,
+  maxRetriesPerRequest: null,
 });
+
+
 
 await connectDB();
 console.log("Worker Started...");
@@ -15,7 +18,9 @@ const worker = new Worker(
   "initial-sync",
   async (job) => {
     const { userId } = job.data;
+    await publishSocketEvent("sync-start", { userId }, userId.toString());
     await syncUserEmails(userId);
+    await publishSocketEvent("sync-complete", { userId }, userId.toString());
   },
   {
     connection: redisConnection,

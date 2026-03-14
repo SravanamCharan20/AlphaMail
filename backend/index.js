@@ -9,12 +9,14 @@ import googleAuthRouter from "./routes/googleAuthRouter.js";
 import gmailRouter from "./routes/gmailRouter.js";
 import http from 'http';
 import { initSocket } from "./config/socketServer.js";
+import { initSocketSubscriber } from "./services/socketPubSub.js";
 
 // CONSTANTS
 const app = express();
 const PORT = process.env.PORT || 9000;
 const server = http.createServer(app);
-initSocket(server);
+const io = initSocket(server);
+initSocketSubscriber(io);
 
 
 // Middlewares
