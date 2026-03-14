@@ -1,14 +1,54 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
 import EmailCards from "./components/EmailCards";
 import socket from "../../utils/socket";
 
 const EmailSidebar = () => {
   const [messages, setMessages] = useState([]);
-  const [count, setCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
+
+  const getEmailSignature = (email) => {
+    if (!email) return "unknown";
+
+    const account = email.account ?? "";
+    const subject = email.subject ?? "";
+    const from = email.from ?? "";
+    const date = email.date ?? "";
+    const snippet = email.snippet ?? "";
+
+    return `sig:${account}|${subject}|${from}|${date}|${snippet}`;
+  };
+
+  const collectEmailKeys = (email) => {
+    const keys = new Set();
+    keys.add(getEmailSignature(email));
+
+    if (email?.threadId) {
+      keys.add(`thread:${email.threadId}`);
+    }
+
+    return keys;
+  };
+
+  const dedupeEmails = (emails) => {
+    const seen = new Set();
+    const unique = [];
+
+    for (const email of emails) {
+      const keys = collectEmailKeys(email);
+      const hasMatch = [...keys].some((key) => seen.has(key));
+
+      if (hasMatch) continue;
+
+      keys.forEach((key) => seen.add(key));
+      unique.push(email);
+    }
+
+    return unique;
+  };
 
   // Fetch initial emails from DB
   const fetchMessages = async () => {
@@ -18,9 +58,9 @@ const EmailSidebar = () => {
       });
 
       const data = await res.json();
+      const uniqueEmails = dedupeEmails(data.emails || []);
 
-      setMessages(data.emails);
-      setCount(data.count);
+      setMessages(uniqueEmails);
     } catch (error) {
       console.log("Fetch error:", error.message);
     }
@@ -28,12 +68,18 @@ const EmailSidebar = () => {
 
   // Trigger email sync
   const handleSync = async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    setSyncing(true);
+
     try {
       await fetch("http://localhost:9000/gmail/initial-sync", {
         method: "POST",
         credentials: "include",
       });
     } catch (error) {
+      syncingRef.current = false;
+      setSyncing(false);
       console.log("Sync error:", error.message);
     }
   };
@@ -54,19 +100,32 @@ const EmailSidebar = () => {
 
     // Worker started syncing
     socket.on("sync-start", () => {
+      syncingRef.current = true;
       setSyncing(true);
     });
 
     // New email received
     socket.on("email-added", (email) => {
-      setMessages((prev) => [email, ...prev]);
+      setMessages((prev) => {
+        const seen = new Set();
+        prev.forEach((item) => {
+          collectEmailKeys(item).forEach((key) => seen.add(key));
+        });
 
-      setCount((prev) => prev + 1);
+        const keys = collectEmailKeys(email);
+        const hasMatch = [...keys].some((key) => seen.has(key));
+
+        if (hasMatch) return prev;
+
+        return [email, ...prev];
+      });
     });
 
     // Sync completed
     socket.on("sync-complete", () => {
+      syncingRef.current = false;
       setSyncing(false);
+      fetchMessages();
     });
 
     // Cleanup listeners
@@ -106,7 +165,9 @@ const EmailSidebar = () => {
         </button>
       </div>
 
-      <p className="text-xs text-gray-500 mb-3">Emails: {count}</p>
+      <p className="text-xs text-gray-500 mb-3">
+        Emails: {messages.length}
+      </p>
 
       <EmailCards msgs={messages} />
     </div>
