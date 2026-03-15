@@ -85,6 +85,9 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
   const query = { userId };
   const account = req.query.account;
   const range = req.query.range;
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+  const skip = (page - 1) * limit;
 
   if (account) {
     query.account = account;
@@ -95,13 +98,18 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
     query.receivedAt = { $gte: bounds.start, $lte: bounds.end };
   }
 
-  const emails = await Email.find(query)
-    .sort({ receivedAt: -1, date: -1 })
-    .limit(20);
+  const [emails, total] = await Promise.all([
+    Email.find(query)
+      .sort({ receivedAt: -1, date: -1 })
+      .skip(skip)
+      .limit(limit),
+    Email.countDocuments(query),
+  ]);
 
   res.json({
     emails,
     count: emails.length,
+    total,
   });
 });
 

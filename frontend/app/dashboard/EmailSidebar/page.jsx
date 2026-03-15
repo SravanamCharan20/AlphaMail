@@ -13,8 +13,12 @@ const EmailSidebar = () => {
   const [accounts, setAccounts] = useState([]);
   const [accountFilter, setAccountFilter] = useState("all");
   const [dateRange, setDateRange] = useState("all");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [total, setTotal] = useState(null);
   const accountFilterRef = useRef("all");
   const dateRangeRef = useRef("all");
+  const pageRef = useRef(1);
 
   const getEmailSignature = (email) => {
     if (!email) return "unknown";
@@ -67,7 +71,7 @@ const EmailSidebar = () => {
   const sortEmails = (emails) =>
     [...emails].sort((a, b) => getEmailTimestamp(b) - getEmailTimestamp(a));
 
-  const buildMessagesPath = (account, range) => {
+  const buildMessagesPath = (account, range, pageNumber, pageLimit) => {
     const params = new URLSearchParams();
 
     if (account !== "all") {
@@ -76,6 +80,12 @@ const EmailSidebar = () => {
     if (range !== "all") {
       params.set("range", range);
     }
+    if (pageNumber) {
+      params.set("page", pageNumber);
+    }
+    if (pageLimit) {
+      params.set("limit", pageLimit);
+    }
     const query = params.toString();
     return query ? `/gmail/messages?${query}` : "/gmail/messages";
   };
@@ -83,7 +93,9 @@ const EmailSidebar = () => {
   // Fetch initial emails from DB
   const fetchMessages = async () => {
     try {
-      const res = await apiFetch(buildMessagesPath(accountFilter, dateRange));
+      const res = await apiFetch(
+        buildMessagesPath(accountFilter, dateRange, page, limit)
+      );
       const data = await res.json();
       const filteredEmails = (data.emails || []).filter((email) =>
         passesFilters(email, accountFilter, dateRange)
@@ -92,6 +104,7 @@ const EmailSidebar = () => {
       const sortedEmails = sortEmails(uniqueEmails);
 
       setMessages(sortedEmails);
+      setTotal(typeof data.total === "number" ? data.total : null);
     } catch (error) {
       console.log("Fetch error:", error.message);
     }
@@ -111,6 +124,7 @@ const EmailSidebar = () => {
         accountFilter !== "all" &&
         !list.some((account) => account.email === accountFilter)
       ) {
+        setPage(1);
         setAccountFilter("all");
       }
     } catch (error) {
@@ -180,11 +194,7 @@ const EmailSidebar = () => {
   };
 
   const passesActiveFilters = (email) =>
-    passesFilters(
-      email,
-      accountFilterRef.current,
-      dateRangeRef.current
-    );
+    passesFilters(email, accountFilterRef.current, dateRangeRef.current);
 
   // Trigger email sync
   const handleSync = async () => {
@@ -212,6 +222,10 @@ const EmailSidebar = () => {
   }, [dateRange]);
 
   useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+
+  useEffect(() => {
     // Socket connection
     if (socket.connected) {
       console.log("Connected to socket:", socket.id);
@@ -236,6 +250,9 @@ const EmailSidebar = () => {
       if (!passesActiveFilters(email)) {
         return;
       }
+      if (pageRef.current !== 1) {
+        return;
+      }
 
       setMessages((prev) => {
         const seen = new Set();
@@ -248,7 +265,8 @@ const EmailSidebar = () => {
 
         if (hasMatch) return prev;
 
-        return sortEmails([email, ...prev]);
+        const next = sortEmails([email, ...prev]);
+        return next.slice(0, limit);
       });
     });
 
@@ -275,7 +293,16 @@ const EmailSidebar = () => {
 
   useEffect(() => {
     fetchMessages();
-  }, [accountFilter, dateRange]);
+  }, [accountFilter, dateRange, page]);
+
+  const canPrev = page > 1;
+  const canNext = total !== null ? page * limit < total : messages.length === limit;
+  const startIndex =
+    messages.length === 0 ? 0 : (page - 1) * limit + 1;
+  const endIndex =
+    total !== null
+      ? Math.min(page * limit, total)
+      : (page - 1) * limit + messages.length;
 
   return (
     <div className="border p-3 m-2 mt-12 w-1/4 min-h-screen bg-white">
@@ -286,7 +313,10 @@ const EmailSidebar = () => {
           <div className="relative">
             <select
               value={accountFilter}
-              onChange={(event) => setAccountFilter(event.target.value)}
+              onChange={(event) => {
+                setPage(1);
+                setAccountFilter(event.target.value);
+              }}
               className="appearance-none rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
             >
               <option value="all">All inbox</option>
@@ -327,7 +357,10 @@ const EmailSidebar = () => {
           <div className="relative">
             <select
               value={dateRange}
-              onChange={(event) => setDateRange(event.target.value)}
+              onChange={(event) => {
+                setPage(1);
+                setDateRange(event.target.value);
+              }}
               className="appearance-none rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
             >
               <option value="all">All time</option>
@@ -345,6 +378,41 @@ const EmailSidebar = () => {
       </div>
 
       <EmailCards msgs={messages} />
+
+      <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+        <span>
+          {total !== null
+            ? `Showing ${startIndex}-${endIndex} of ${total}`
+            : `Showing ${startIndex}-${endIndex}`}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            disabled={!canPrev}
+            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+              canPrev
+                ? "border-gray-200 text-gray-700 hover:bg-gray-50"
+                : "cursor-not-allowed border-gray-100 text-gray-300"
+            }`}
+          >
+            Prev
+          </button>
+          <span className="text-[11px] text-gray-400">Page {page}</span>
+          <button
+            type="button"
+            onClick={() => setPage((prev) => prev + 1)}
+            disabled={!canNext}
+            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+              canNext
+                ? "border-gray-200 text-gray-700 hover:bg-gray-50"
+                : "cursor-not-allowed border-gray-100 text-gray-300"
+            }`}
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
