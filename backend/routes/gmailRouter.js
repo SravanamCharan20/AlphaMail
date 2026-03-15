@@ -24,6 +24,48 @@ function getEmailBody(payload) {
   return null;
 }
 
+function getDateRangeBounds(range) {
+  if (!range || range === "all") return null;
+
+  const now = new Date();
+  const startOfDay = (date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const endOfDay = (date) =>
+    new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
+
+  if (range === "today") {
+    return { start: startOfDay(now), end: endOfDay(now) };
+  }
+
+  if (range === "yesterday") {
+    const y = new Date(now);
+    y.setDate(now.getDate() - 1);
+    return { start: startOfDay(y), end: endOfDay(y) };
+  }
+
+  if (range === "week") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    return { start: startOfDay(start), end: now };
+  }
+
+  if (range === "month") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 29);
+    return { start: startOfDay(start), end: now };
+  }
+
+  return null;
+}
+
 // Adding Job into the emailQueue
 gmailRouter.post("/initial-sync", userAuth, async (req, res) => {
   const userId = req.user;
@@ -40,7 +82,22 @@ gmailRouter.post("/initial-sync", userAuth, async (req, res) => {
 gmailRouter.get("/messages", userAuth, async (req, res) => {
   const userId = req.user;
 
-  const emails = await Email.find({ userId }).sort({ date: -1 }).limit(20);
+  const query = { userId };
+  const account = req.query.account;
+  const range = req.query.range;
+
+  if (account) {
+    query.account = account;
+  }
+
+  const bounds = getDateRangeBounds(range);
+  if (bounds) {
+    query.receivedAt = { $gte: bounds.start, $lte: bounds.end };
+  }
+
+  const emails = await Email.find(query)
+    .sort({ receivedAt: -1, date: -1 })
+    .limit(20);
 
   res.json({
     emails,

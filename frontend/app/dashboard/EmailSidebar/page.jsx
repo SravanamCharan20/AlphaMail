@@ -4,11 +4,17 @@ import React, { useEffect, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
 import EmailCards from "./components/EmailCards";
 import socket from "../../utils/socket";
+import { apiFetch } from "../../utils/api";
 
 const EmailSidebar = () => {
   const [messages, setMessages] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const syncingRef = useRef(false);
+  const [accounts, setAccounts] = useState([]);
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [dateRange, setDateRange] = useState("all");
+  const accountFilterRef = useRef("all");
+  const dateRangeRef = useRef("all");
 
   const getEmailSignature = (email) => {
     if (!email) return "unknown";
@@ -50,21 +56,135 @@ const EmailSidebar = () => {
     return unique;
   };
 
+  const getEmailTimestamp = (email) => {
+    const candidate = email?.receivedAt || email?.date;
+    if (!candidate) return 0;
+    const parsed = new Date(candidate);
+    const value = parsed.getTime();
+    return Number.isNaN(value) ? 0 : value;
+  };
+
+  const sortEmails = (emails) =>
+    [...emails].sort((a, b) => getEmailTimestamp(b) - getEmailTimestamp(a));
+
+  const buildMessagesPath = (account, range) => {
+    const params = new URLSearchParams();
+
+    if (account !== "all") {
+      params.set("account", account);
+    }
+    if (range !== "all") {
+      params.set("range", range);
+    }
+    const query = params.toString();
+    return query ? `/gmail/messages?${query}` : "/gmail/messages";
+  };
+
   // Fetch initial emails from DB
   const fetchMessages = async () => {
     try {
-      const res = await fetch("http://localhost:9000/gmail/messages", {
-        credentials: "include",
-      });
-
+      const res = await apiFetch(buildMessagesPath(accountFilter, dateRange));
       const data = await res.json();
-      const uniqueEmails = dedupeEmails(data.emails || []);
+      const filteredEmails = (data.emails || []).filter((email) =>
+        passesFilters(email, accountFilter, dateRange)
+      );
+      const uniqueEmails = dedupeEmails(filteredEmails);
+      const sortedEmails = sortEmails(uniqueEmails);
 
-      setMessages(uniqueEmails);
+      setMessages(sortedEmails);
     } catch (error) {
       console.log("Fetch error:", error.message);
     }
   };
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await apiFetch("/googleAuth/accounts");
+      if (!res.ok) {
+        setAccounts([]);
+        return;
+      }
+      const data = await res.json();
+      const list = Array.isArray(data.accounts) ? data.accounts : [];
+      setAccounts(list);
+      if (
+        accountFilter !== "all" &&
+        !list.some((account) => account.email === accountFilter)
+      ) {
+        setAccountFilter("all");
+      }
+    } catch (error) {
+      console.warn("Failed to load accounts:", error);
+      setAccounts([]);
+    }
+  };
+
+  const getDateRangeBounds = (range) => {
+    const now = new Date();
+    const startOfDay = (date) =>
+      new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const endOfDay = (date) =>
+      new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        23,
+        59,
+        59,
+        999
+      );
+
+    if (range === "today") {
+      return { start: startOfDay(now), end: endOfDay(now) };
+    }
+
+    if (range === "yesterday") {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      return { start: startOfDay(y), end: endOfDay(y) };
+    }
+
+    if (range === "week") {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 6);
+      return { start: startOfDay(start), end: now };
+    }
+
+    if (range === "month") {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 29);
+      return { start: startOfDay(start), end: now };
+    }
+
+    return null;
+  };
+
+  const passesFilters = (email, activeAccount, activeRange) => {
+    if (activeAccount !== "all" && email?.account !== activeAccount) {
+      return false;
+    }
+
+    if (activeRange === "all") return true;
+
+    const candidate = email?.receivedAt || email?.date;
+    const parsed = candidate ? new Date(candidate) : null;
+
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return false;
+    }
+
+    const bounds = getDateRangeBounds(activeRange);
+    if (!bounds) return true;
+
+    return parsed >= bounds.start && parsed <= bounds.end;
+  };
+
+  const passesActiveFilters = (email) =>
+    passesFilters(
+      email,
+      accountFilterRef.current,
+      dateRangeRef.current
+    );
 
   // Trigger email sync
   const handleSync = async () => {
@@ -73,9 +193,8 @@ const EmailSidebar = () => {
     setSyncing(true);
 
     try {
-      await fetch("http://localhost:9000/gmail/initial-sync", {
+      await apiFetch("/gmail/initial-sync", {
         method: "POST",
-        credentials: "include",
       });
     } catch (error) {
       syncingRef.current = false;
@@ -83,6 +202,14 @@ const EmailSidebar = () => {
       console.log("Sync error:", error.message);
     }
   };
+
+  useEffect(() => {
+    accountFilterRef.current = accountFilter;
+  }, [accountFilter]);
+
+  useEffect(() => {
+    dateRangeRef.current = dateRange;
+  }, [dateRange]);
 
   useEffect(() => {
     // Socket connection
@@ -106,6 +233,10 @@ const EmailSidebar = () => {
 
     // New email received
     socket.on("email-added", (email) => {
+      if (!passesActiveFilters(email)) {
+        return;
+      }
+
       setMessages((prev) => {
         const seen = new Set();
         prev.forEach((item) => {
@@ -117,7 +248,7 @@ const EmailSidebar = () => {
 
         if (hasMatch) return prev;
 
-        return [email, ...prev];
+        return sortEmails([email, ...prev]);
       });
     });
 
@@ -138,16 +269,41 @@ const EmailSidebar = () => {
     };
   }, []);
 
-  // Load cached emails when component mounts
+  useEffect(() => {
+    fetchAccounts();
+  }, []);
+
   useEffect(() => {
     fetchMessages();
-  }, []);
+  }, [accountFilter, dateRange]);
 
   return (
     <div className="border p-3 m-2 mt-12 w-1/4 min-h-screen bg-white">
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="font-semibold text-lg">Inbox</h1>
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-2">
+          <h1 className="font-semibold text-lg">Inbox</h1>
+          <div className="relative">
+            <select
+              value={accountFilter}
+              onChange={(event) => setAccountFilter(event.target.value)}
+              className="appearance-none rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="all">All inbox</option>
+              {accounts.map((account) => (
+                <option
+                  key={account._id || `${account.provider}-${account.email}`}
+                  value={account.email}
+                >
+                  {account.email}
+                </option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
+              ▾
+            </span>
+          </div>
+        </div>
 
         <button
           onClick={handleSync}
@@ -165,9 +321,28 @@ const EmailSidebar = () => {
         </button>
       </div>
 
-      <p className="text-xs text-gray-500 mb-3">
-        Emails: {messages.length}
-      </p>
+      <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-500">Date</span>
+          <div className="relative">
+            <select
+              value={dateRange}
+              onChange={(event) => setDateRange(event.target.value)}
+              className="appearance-none rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="all">All time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="week">Last 7 days</option>
+              <option value="month">Last 30 days</option>
+            </select>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
+              ▾
+            </span>
+          </div>
+        </div>
+        <span>Emails: {messages.length}</span>
+      </div>
 
       <EmailCards msgs={messages} />
     </div>

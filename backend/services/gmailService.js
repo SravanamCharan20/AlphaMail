@@ -50,6 +50,12 @@ export const syncUserEmails = async (userId) => {
         const subject = headers.find((h) => h.name === "Subject")?.value;
         const from = headers.find((h) => h.name === "From")?.value;
         const date = headers.find((h) => h.name === "Date")?.value;
+        const internalDateMs = Number(message.internalDate);
+        const receivedAt = Number.isFinite(internalDateMs)
+          ? new Date(internalDateMs)
+          : date
+          ? new Date(date)
+          : null;
 
         await Email.updateOne(
           { threadId: threadData.data.id },
@@ -59,6 +65,7 @@ export const syncUserEmails = async (userId) => {
             subject,
             from,
             date,
+            receivedAt,
             snippet: message.snippet,
             userId,
           },
@@ -68,9 +75,11 @@ export const syncUserEmails = async (userId) => {
           "email-added",
           {
             account: account.email,
+            threadId: threadData.data.id,
             subject,
             from,
             date,
+            receivedAt,
             snippet: message.snippet,
           },
           userId.toString()

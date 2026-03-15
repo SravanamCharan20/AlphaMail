@@ -11,6 +11,7 @@ const emailSchema = new mongoose.Schema(
     subject: String,
     from: String,
     date: String,
+    receivedAt: Date,
     snippet: String,
   },
   { timestamps: true }
