@@ -24,43 +24,51 @@ function getEmailBody(payload) {
   return null;
 }
 
-function getDateRangeBounds(range) {
+function getDateRangeBounds(range, tzOffsetMinutes = 0) {
   if (!range || range === "all") return null;
 
-  const now = new Date();
-  const startOfDay = (date) =>
-    new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const endOfDay = (date) =>
-    new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      23,
-      59,
-      59,
-      999
+  const safeOffset = Number.isFinite(tzOffsetMinutes)
+    ? Math.min(Math.max(tzOffsetMinutes, -840), 840)
+    : 0;
+  const offsetMs = safeOffset * 60 * 1000;
+  const nowUtc = new Date();
+  const nowLocal = new Date(nowUtc.getTime() + offsetMs);
+
+  const getStartEndForLocalDate = (localDate) => {
+    const year = localDate.getUTCFullYear();
+    const month = localDate.getUTCMonth();
+    const day = localDate.getUTCDate();
+
+    const startUtc = new Date(Date.UTC(year, month, day) - offsetMs);
+    const endUtc = new Date(
+      Date.UTC(year, month, day, 23, 59, 59, 999) - offsetMs
     );
 
+    return { start: startUtc, end: endUtc };
+  };
+
   if (range === "today") {
-    return { start: startOfDay(now), end: endOfDay(now) };
+    return getStartEndForLocalDate(nowLocal);
   }
 
   if (range === "yesterday") {
-    const y = new Date(now);
-    y.setDate(now.getDate() - 1);
-    return { start: startOfDay(y), end: endOfDay(y) };
+    const y = new Date(nowLocal);
+    y.setUTCDate(y.getUTCDate() - 1);
+    return getStartEndForLocalDate(y);
   }
 
   if (range === "week") {
-    const start = new Date(now);
-    start.setDate(now.getDate() - 6);
-    return { start: startOfDay(start), end: now };
+    const start = new Date(nowLocal);
+    start.setUTCDate(start.getUTCDate() - 6);
+    const { start: startUtc } = getStartEndForLocalDate(start);
+    return { start: startUtc, end: nowUtc };
   }
 
   if (range === "month") {
-    const start = new Date(now);
-    start.setDate(now.getDate() - 29);
-    return { start: startOfDay(start), end: now };
+    const start = new Date(nowLocal);
+    start.setUTCDate(start.getUTCDate() - 29);
+    const { start: startUtc } = getStartEndForLocalDate(start);
+    return { start: startUtc, end: nowUtc };
   }
 
   return null;
@@ -84,25 +92,27 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
 
   const query = { userId };
   const account = req.query.account;
-  const range = req.query.range;
+  const range = (req.query.range || "all").toLowerCase();
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
   const skip = (page - 1) * limit;
+  const tzOffset = parseInt(req.query.tzOffset, 10);
 
   if (account) {
     query.account = account;
   }
 
-  const bounds = getDateRangeBounds(range);
+  const bounds = getDateRangeBounds(range, tzOffset);
   if (bounds) {
     query.receivedAt = { $gte: bounds.start, $lte: bounds.end };
   }
 
   const [emails, total] = await Promise.all([
     Email.find(query)
-      .sort({ receivedAt: -1, date: -1 })
+      .sort({ receivedAt: -1, _id: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     Email.countDocuments(query),
   ]);
 
@@ -110,6 +120,9 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
     emails,
     count: emails.length,
     total,
+    page,
+    limit,
+    hasNext: page * limit < total,
   });
 });
 

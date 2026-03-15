@@ -33,6 +33,10 @@ const Navbar = () => {
     }
   };
 
+  const notifyAccountsUpdated = () => {
+    window.dispatchEvent(new CustomEvent("accounts-updated"));
+  };
+
   const handleConnectMail = () => {
     const url = `${API_BASE}/googleAuth/google`;
     window.open(url, "_blank", "width=800,height=700");
@@ -53,9 +57,43 @@ const Navbar = () => {
     }
   };
 
+  const handleDisconnectAccount = async (account) => {
+    if (!account?._id) return;
+    const confirmed = window.confirm(
+      `Disconnect ${account.email}? This will remove its emails from your inbox.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await apiFetch(`/googleAuth/accounts/${account._id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setToast({
+          title: "Disconnect failed",
+          message: "Please try again.",
+        });
+        return;
+      }
+
+      setAccounts((prev) => prev.filter((item) => item._id !== account._id));
+      setToast({
+        title: "Account disconnected",
+        message: account.email,
+      });
+      notifyAccountsUpdated();
+    } catch (error) {
+      console.warn("Failed to disconnect account:", error);
+      setToast({
+        title: "Disconnect failed",
+        message: "Please try again.",
+      });
+    }
+  };
+
   useEffect(() => {
     if (loading || !user) return;
-    fetchAccounts();
+    fetchAccounts().finally(() => notifyAccountsUpdated());
   }, [loading, user]);
 
   useEffect(() => {
@@ -76,7 +114,7 @@ const Navbar = () => {
           ? `${email} linked successfully.`
           : `${provider} linked successfully.`,
       });
-      fetchAccounts();
+      fetchAccounts().finally(() => notifyAccountsUpdated());
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
@@ -270,7 +308,7 @@ const Navbar = () => {
                                   .toUpperCase()
                                   .slice(0, 1)}
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-xs font-semibold text-neutral-800 truncate">
                                   {account.provider === "gmail"
                                     ? "Gmail"
@@ -280,6 +318,13 @@ const Navbar = () => {
                                   {account.email}
                                 </p>
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDisconnectAccount(account)}
+                                className="rounded-full border border-neutral-200 bg-white px-2 py-1 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-100"
+                              >
+                                Disconnect
+                              </button>
                             </div>
                           ))
                         ) : (

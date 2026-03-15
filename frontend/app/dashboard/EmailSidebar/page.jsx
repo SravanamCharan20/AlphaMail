@@ -1,75 +1,46 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
 import EmailCards from "./components/EmailCards";
 import socket from "../../utils/socket";
 import { apiFetch } from "../../utils/api";
+import {
+  dedupeEmails,
+  mergeEmails,
+  sortEmails,
+} from "./emailUtils";
+import { matchesFilters } from "./filterUtils";
+
+const PAGE_SIZE = 5;
 
 const EmailSidebar = () => {
   const [messages, setMessages] = useState([]);
-  const [syncing, setSyncing] = useState(false);
-  const syncingRef = useRef(false);
   const [accounts, setAccounts] = useState([]);
   const [accountFilter, setAccountFilter] = useState("all");
   const [dateRange, setDateRange] = useState("all");
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
-  const [total, setTotal] = useState(null);
-  const accountFilterRef = useRef("all");
-  const dateRangeRef = useRef("all");
+  const [total, setTotal] = useState(0);
+  const [hasNext, setHasNext] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [newMailCount, setNewMailCount] = useState(0);
+
+  const filtersRef = useRef({ account: "all", range: "all" });
+  const lastFiltersRef = useRef({ account: "all", range: "all" });
   const pageRef = useRef(1);
+  const fetchSeqRef = useRef(0);
+  const fetchAbortRef = useRef(null);
 
-  const getEmailSignature = (email) => {
-    if (!email) return "unknown";
+  const tzOffset = useMemo(() => -new Date().getTimezoneOffset(), []);
 
-    const account = email.account ?? "";
-    const subject = email.subject ?? "";
-    const from = email.from ?? "";
-    const date = email.date ?? "";
-    const snippet = email.snippet ?? "";
-
-    return `sig:${account}|${subject}|${from}|${date}|${snippet}`;
+  const updateRefs = () => {
+    filtersRef.current = { account: accountFilter, range: dateRange };
+    pageRef.current = page;
   };
 
-  const collectEmailKeys = (email) => {
-    const keys = new Set();
-    keys.add(getEmailSignature(email));
-
-    if (email?.threadId) {
-      keys.add(`thread:${email.threadId}`);
-    }
-
-    return keys;
-  };
-
-  const dedupeEmails = (emails) => {
-    const seen = new Set();
-    const unique = [];
-
-    for (const email of emails) {
-      const keys = collectEmailKeys(email);
-      const hasMatch = [...keys].some((key) => seen.has(key));
-
-      if (hasMatch) continue;
-
-      keys.forEach((key) => seen.add(key));
-      unique.push(email);
-    }
-
-    return unique;
-  };
-
-  const getEmailTimestamp = (email) => {
-    const candidate = email?.receivedAt || email?.date;
-    if (!candidate) return 0;
-    const parsed = new Date(candidate);
-    const value = parsed.getTime();
-    return Number.isNaN(value) ? 0 : value;
-  };
-
-  const sortEmails = (emails) =>
-    [...emails].sort((a, b) => getEmailTimestamp(b) - getEmailTimestamp(a));
+  useEffect(updateRefs, [accountFilter, dateRange, page]);
 
   const buildMessagesPath = (account, range, pageNumber, pageLimit) => {
     const params = new URLSearchParams();
@@ -80,33 +51,59 @@ const EmailSidebar = () => {
     if (range !== "all") {
       params.set("range", range);
     }
-    if (pageNumber) {
-      params.set("page", pageNumber);
-    }
-    if (pageLimit) {
-      params.set("limit", pageLimit);
-    }
-    const query = params.toString();
-    return query ? `/gmail/messages?${query}` : "/gmail/messages";
+
+    params.set("page", String(pageNumber));
+    params.set("limit", String(pageLimit));
+    params.set("tzOffset", String(tzOffset));
+
+    return `/gmail/messages?${params.toString()}`;
   };
 
-  // Fetch initial emails from DB
-  const fetchMessages = async () => {
+  const fetchMessages = async (options = {}) => {
+    const { resetNew = false } = options;
+    const seq = fetchSeqRef.current + 1;
+    fetchSeqRef.current = seq;
+    if (fetchAbortRef.current) {
+      fetchAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    fetchAbortRef.current = controller;
+
+    setLoading(true);
+    setError(null);
+    setHasNext(null);
+
     try {
       const res = await apiFetch(
-        buildMessagesPath(accountFilter, dateRange, page, limit)
+        buildMessagesPath(accountFilter, dateRange, page, PAGE_SIZE),
+        { signal: controller.signal }
       );
-      const data = await res.json();
-      const filteredEmails = (data.emails || []).filter((email) =>
-        passesFilters(email, accountFilter, dateRange)
-      );
-      const uniqueEmails = dedupeEmails(filteredEmails);
-      const sortedEmails = sortEmails(uniqueEmails);
+      if (fetchSeqRef.current !== seq) return;
+      if (!res.ok) {
+        setError("Failed to load messages.");
+        setLoading(false);
+        return;
+      }
 
-      setMessages(sortedEmails);
-      setTotal(typeof data.total === "number" ? data.total : null);
-    } catch (error) {
-      console.log("Fetch error:", error.message);
+      const data = await res.json();
+      if (fetchSeqRef.current !== seq) return;
+      const emails = Array.isArray(data.emails) ? data.emails : [];
+      const uniqueEmails = dedupeEmails(emails);
+
+      setMessages(uniqueEmails);
+      setTotal(typeof data.total === "number" ? data.total : emails.length);
+      setHasNext(
+        typeof data.hasNext === "boolean" ? data.hasNext : null
+      );
+      if (resetNew) setNewMailCount(0);
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      console.log("Fetch error:", err?.message || err);
+      setError("Failed to load messages.");
+    } finally {
+      if (fetchSeqRef.current === seq) {
+        setLoading(false);
+      }
     }
   };
 
@@ -124,8 +121,8 @@ const EmailSidebar = () => {
         accountFilter !== "all" &&
         !list.some((account) => account.email === accountFilter)
       ) {
-        setPage(1);
         setAccountFilter("all");
+        setPage(1);
       }
     } catch (error) {
       console.warn("Failed to load accounts:", error);
@@ -133,104 +130,62 @@ const EmailSidebar = () => {
     }
   };
 
-  const getDateRangeBounds = (range) => {
-    const now = new Date();
-    const startOfDay = (date) =>
-      new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const endOfDay = (date) =>
-      new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-        23,
-        59,
-        59,
-        999
-      );
-
-    if (range === "today") {
-      return { start: startOfDay(now), end: endOfDay(now) };
+  const handleRefresh = () => {
+    if (page !== 1) {
+      setPage(1);
+      return;
     }
-
-    if (range === "yesterday") {
-      const y = new Date(now);
-      y.setDate(now.getDate() - 1);
-      return { start: startOfDay(y), end: endOfDay(y) };
-    }
-
-    if (range === "week") {
-      const start = new Date(now);
-      start.setDate(now.getDate() - 6);
-      return { start: startOfDay(start), end: now };
-    }
-
-    if (range === "month") {
-      const start = new Date(now);
-      start.setDate(now.getDate() - 29);
-      return { start: startOfDay(start), end: now };
-    }
-
-    return null;
-  };
-
-  const passesFilters = (email, activeAccount, activeRange) => {
-    if (activeAccount !== "all" && email?.account !== activeAccount) {
-      return false;
-    }
-
-    if (activeRange === "all") return true;
-
-    const candidate = email?.receivedAt || email?.date;
-    const parsed = candidate ? new Date(candidate) : null;
-
-    if (!parsed || Number.isNaN(parsed.getTime())) {
-      return false;
-    }
-
-    const bounds = getDateRangeBounds(activeRange);
-    if (!bounds) return true;
-
-    return parsed >= bounds.start && parsed <= bounds.end;
-  };
-
-  const passesActiveFilters = (email) =>
-    passesFilters(email, accountFilterRef.current, dateRangeRef.current);
-
-  // Trigger email sync
-  const handleSync = async () => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    setSyncing(true);
-
-    try {
-      await apiFetch("/gmail/initial-sync", {
-        method: "POST",
-      });
-    } catch (error) {
-      syncingRef.current = false;
-      setSyncing(false);
-      console.log("Sync error:", error.message);
-    }
+    fetchMessages({ resetNew: true });
   };
 
   useEffect(() => {
-    accountFilterRef.current = accountFilter;
-  }, [accountFilter]);
+    fetchAccounts();
+  }, []);
 
   useEffect(() => {
-    dateRangeRef.current = dateRange;
-  }, [dateRange]);
+    const handleAccountsUpdate = () => {
+      fetchAccounts();
+      if (pageRef.current !== 1) {
+        setPage(1);
+        return;
+      }
+      fetchMessages({ resetNew: true });
+    };
+
+    window.addEventListener("accounts-updated", handleAccountsUpdate);
+    return () =>
+      window.removeEventListener("accounts-updated", handleAccountsUpdate);
+  }, []);
 
   useEffect(() => {
-    pageRef.current = page;
-  }, [page]);
+    const lastFilters = lastFiltersRef.current;
+    const filtersChanged =
+      lastFilters.account !== accountFilter ||
+      lastFilters.range !== dateRange;
+
+    if (filtersChanged) {
+      lastFiltersRef.current = { account: accountFilter, range: dateRange };
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+
+    fetchMessages();
+  }, [accountFilter, dateRange, page]);
+
+  useEffect(() => {
+    setNewMailCount(0);
+  }, [accountFilter, dateRange]);
+
+  useEffect(() => {
+    if (page === 1 && newMailCount !== 0) {
+      setNewMailCount(0);
+    }
+  }, [page, newMailCount]);
 
   useEffect(() => {
     // Socket connection
-    if (socket.connected) {
-      console.log("Connected to socket:", socket.id);
-    }
-
     socket.on("connect", () => {
       console.log("Connected to socket:", socket.id);
     });
@@ -239,45 +194,38 @@ const EmailSidebar = () => {
       console.log("Socket disconnected");
     });
 
-    // Worker started syncing
     socket.on("sync-start", () => {
-      syncingRef.current = true;
       setSyncing(true);
     });
 
-    // New email received
     socket.on("email-added", (email) => {
-      if (!passesActiveFilters(email)) {
+      const filters = filtersRef.current;
+      if (!matchesFilters(email, filters)) {
         return;
       }
+
       if (pageRef.current !== 1) {
+        setNewMailCount((prev) => prev + 1);
+        setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
         return;
       }
 
       setMessages((prev) => {
-        const seen = new Set();
-        prev.forEach((item) => {
-          collectEmailKeys(item).forEach((key) => seen.add(key));
-        });
-
-        const keys = collectEmailKeys(email);
-        const hasMatch = [...keys].some((key) => seen.has(key));
-
-        if (hasMatch) return prev;
-
-        const next = sortEmails([email, ...prev]);
-        return next.slice(0, limit);
+        const merged = mergeEmails(prev, email);
+        const sorted = sortEmails(merged);
+        return sorted.slice(0, PAGE_SIZE);
       });
+
+      setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
     });
 
-    // Sync completed
     socket.on("sync-complete", () => {
-      syncingRef.current = false;
       setSyncing(false);
-      fetchMessages();
+      if (pageRef.current === 1) {
+        fetchMessages({ resetNew: true });
+      }
     });
 
-    // Cleanup listeners
     return () => {
       socket.off("connect");
       socket.off("disconnect");
@@ -287,27 +235,18 @@ const EmailSidebar = () => {
     };
   }, []);
 
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
-
-  useEffect(() => {
-    fetchMessages();
-  }, [accountFilter, dateRange, page]);
-
   const canPrev = page > 1;
-  const canNext = total !== null ? page * limit < total : messages.length === limit;
-  const startIndex =
-    messages.length === 0 ? 0 : (page - 1) * limit + 1;
-  const endIndex =
-    total !== null
-      ? Math.min(page * limit, total)
-      : (page - 1) * limit + messages.length;
+  const fallbackNext =
+    total ? page * PAGE_SIZE < total : messages.length === PAGE_SIZE;
+  const canNext = hasNext !== null ? hasNext : fallbackNext;
+  const startIndex = messages.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endIndex = total
+    ? Math.min(page * PAGE_SIZE, total)
+    : (page - 1) * PAGE_SIZE + messages.length;
 
   return (
     <div className="border p-3 m-2 mt-12 w-1/4 min-h-screen bg-white">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-2">
+      <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-2">
           <h1 className="font-semibold text-lg">Inbox</h1>
           <div className="relative">
@@ -335,20 +274,23 @@ const EmailSidebar = () => {
           </div>
         </div>
 
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className={`flex items-center gap-2 px-3 py-1 rounded-md text-white transition
-          ${
-            syncing
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-500 hover:bg-blue-600"
-          }`}
-        >
-          {syncing && <FaSpinner className="animate-spin" />}
-
-          {syncing ? "Syncing..." : "Sync"}
-        </button>
+        <div className="flex items-center gap-2 text-xs">
+          <span
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold ${
+              syncing
+                ? "bg-blue-50 text-blue-700"
+                : "bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                syncing ? "bg-blue-500 animate-pulse" : "bg-emerald-500"
+              }`}
+            />
+            {syncing ? "Syncing" : "Up to date"}
+          </span>
+          {syncing && <FaSpinner className="animate-spin text-blue-500" />}
+        </div>
       </div>
 
       <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
@@ -374,14 +316,40 @@ const EmailSidebar = () => {
             </span>
           </div>
         </div>
-        <span>Emails: {messages.length}</span>
+        <span>Emails: {total || messages.length}</span>
       </div>
 
-      <EmailCards msgs={messages} />
+      {newMailCount > 0 && page !== 1 && (
+        <button
+          type="button"
+          onClick={handleRefresh}
+          className="mb-3 w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700"
+        >
+          {newMailCount} new messages · Refresh
+        </button>
+      )}
+
+      {error && (
+        <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
+          Loading messages...
+        </div>
+      ) : messages.length === 0 ? (
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
+          No emails found for this filter.
+        </div>
+      ) : (
+        <EmailCards msgs={messages} />
+      )}
 
       <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
         <span>
-          {total !== null
+          {total
             ? `Showing ${startIndex}-${endIndex} of ${total}`
             : `Showing ${startIndex}-${endIndex}`}
         </span>

@@ -26,7 +26,7 @@ export const syncUserEmails = async (userId) => {
 
       const threads = await gmail.users.threads.list({
         userId: "me",
-        maxResults: 10,
+        maxResults: 100,
       });
 
       if (!threads.data.threads) continue;
@@ -58,7 +58,7 @@ export const syncUserEmails = async (userId) => {
           : null;
 
         await Email.updateOne(
-          { threadId: threadData.data.id },
+          { userId, account: account.email, threadId: threadData.data.id },
           {
             account: account.email,
             threadId: threadData.data.id,

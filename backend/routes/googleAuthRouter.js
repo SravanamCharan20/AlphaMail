@@ -4,8 +4,10 @@ import jwt from "jsonwebtoken";
 import { google } from "googleapis";
 import User from "../models/User.js";
 import EmailAccount from "../models/EmailAccount.js";
+import Email from "../models/Email.js";
 import userAuth from "../middlewares/auth.js";
 import { SCOPES, createOAuth2Client } from "./constants.js";
+import { emailQueue } from "../queues/emailQueue.js";
 dotenv.config();
 
 const googleAuthRouter = express.Router();
@@ -111,6 +113,14 @@ googleAuthRouter.get("/google/callback", async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    try {
+      await emailQueue.add("initial-sync-emails", {
+        userId: user._id,
+      });
+    } catch (queueError) {
+      console.error("Failed to enqueue initial sync:", queueError);
+    }
+
     const successUrl = `http://localhost:3000/oauth/success?provider=gmail&email=${encodeURIComponent(
       gmailAddress
     )}`;
@@ -138,6 +148,28 @@ googleAuthRouter.get("/accounts", userAuth, async (req, res) => {
   } catch (err) {
     console.error("Error fetching connected accounts:", err);
     return res.status(500).json({ message: "Failed to fetch accounts" });
+  }
+});
+
+googleAuthRouter.delete("/accounts/:accountId", userAuth, async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const account = await EmailAccount.findOne({
+      _id: accountId,
+      userId: req.user,
+    });
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    await EmailAccount.deleteOne({ _id: accountId, userId: req.user });
+    await Email.deleteMany({ userId: req.user, account: account.email });
+
+    return res.status(200).json({ message: "Account disconnected" });
+  } catch (err) {
+    console.error("Error disconnecting account:", err);
+    return res.status(500).json({ message: "Failed to disconnect account" });
   }
 });
 

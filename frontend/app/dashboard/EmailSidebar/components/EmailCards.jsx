@@ -32,8 +32,8 @@ const EmailCards = ({ msgs }) => {
     <div className="flex flex-col gap-3">
       {msgs.map((mail, index) => (
         <div
-          key={mail.threadId || index}
-          className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md animate-fadeInUp"
+          key={mail._id || mail.threadId || index}
+          className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-gray-300 animate-fadeInUp"
           style={{
             animationDelay: `${index * 70}ms`,
           }}
