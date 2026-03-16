@@ -4,6 +4,90 @@ import Email from "../models/Email.js";
 import { createOAuth2Client } from "../routes/constants.js";
 import { publishSocketEvent } from "./socketPubSub.js";
 
+const createGmailClient = (account) => {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: account.accessToken,
+    refresh_token: account.refreshToken,
+  });
+
+  return google.gmail({
+    version: "v1",
+    auth: oauth2Client,
+  });
+};
+
+const getHeaderValue = (headers, name) =>
+  headers.find((header) => header.name === name)?.value;
+
+const buildEmailPayloadFromMessage = (message, threadIdOverride) => {
+  if (!message) return null;
+
+  const headers = message.payload?.headers || [];
+  const subject = getHeaderValue(headers, "Subject");
+  const from = getHeaderValue(headers, "From");
+  const date = getHeaderValue(headers, "Date");
+  const internalDateMs = Number(message.internalDate);
+  const receivedAt = Number.isFinite(internalDateMs)
+    ? new Date(internalDateMs)
+    : date
+    ? new Date(date)
+    : null;
+
+  return {
+    threadId: threadIdOverride || message.threadId,
+    subject,
+    from,
+    date,
+    receivedAt,
+    snippet: message.snippet,
+  };
+};
+
+const upsertEmailAndPublish = async ({
+  userId,
+  accountEmail,
+  emailPayload,
+  syncSource,
+  isIncremental,
+}) => {
+  if (!emailPayload?.threadId) return null;
+
+  const result = await Email.updateOne(
+    { userId, account: accountEmail, threadId: emailPayload.threadId },
+    {
+      account: accountEmail,
+      threadId: emailPayload.threadId,
+      subject: emailPayload.subject,
+      from: emailPayload.from,
+      date: emailPayload.date,
+      receivedAt: emailPayload.receivedAt,
+      snippet: emailPayload.snippet,
+      userId,
+      syncSource,
+      lastSyncedAt: new Date(),
+    },
+    { upsert: true }
+  );
+
+  await publishSocketEvent(
+    "email-added",
+    {
+      account: accountEmail,
+      threadId: emailPayload.threadId,
+      subject: emailPayload.subject,
+      from: emailPayload.from,
+      date: emailPayload.date,
+      receivedAt: emailPayload.receivedAt,
+      snippet: emailPayload.snippet,
+      isIncremental,
+    },
+    userId.toString()
+  );
+
+  return result;
+};
+
 
 export const syncUserEmails = async (userId) => {
   try {
@@ -12,17 +96,7 @@ export const syncUserEmails = async (userId) => {
     );
 
     for (const account of accounts) {
-      const oauth2Client = createOAuth2Client();
-
-      oauth2Client.setCredentials({
-        access_token: account.accessToken,
-        refresh_token: account.refreshToken,
-      });
-
-      const gmail = google.gmail({
-        version: "v1",
-        auth: oauth2Client,
-      });
+      const gmail = createGmailClient(account);
 
       const threads = await gmail.users.threads.list({
         userId: "me",
@@ -45,48 +119,18 @@ export const syncUserEmails = async (userId) => {
         const message =
           threadData.data.messages[threadData.data.messages.length - 1];
 
-        const headers = message.payload.headers;
-
-        const subject = headers.find((h) => h.name === "Subject")?.value;
-        const from = headers.find((h) => h.name === "From")?.value;
-        const date = headers.find((h) => h.name === "Date")?.value;
-        const internalDateMs = Number(message.internalDate);
-        const receivedAt = Number.isFinite(internalDateMs)
-          ? new Date(internalDateMs)
-          : date
-          ? new Date(date)
-          : null;
-
-        await Email.updateOne(
-          { userId, account: account.email, threadId: threadData.data.id },
-          {
-            account: account.email,
-            threadId: threadData.data.id,
-            subject,
-            from,
-            date,
-            receivedAt,
-            snippet: message.snippet,
-            userId,
-            syncSource: "initial",
-            lastSyncedAt: new Date(),
-          },
-          { upsert: true }
+        const emailPayload = buildEmailPayloadFromMessage(
+          message,
+          threadData.data.id
         );
-        await publishSocketEvent(
-          "email-added",
-          {
-            account: account.email,
-            threadId: threadData.data.id,
-            subject,
-            from,
-            date,
-            receivedAt,
-            snippet: message.snippet,
-            isIncremental: false,
-          },
-          userId.toString()
-        );
+
+        await upsertEmailAndPublish({
+          userId,
+          accountEmail: account.email,
+          emailPayload,
+          syncSource: "initial",
+          isIncremental: false,
+        });
       }
     }
 
@@ -106,16 +150,7 @@ export const watchMailboxForAccount = async (account) => {
     ? process.env.PUBSUB_LABELS.split(",").map((label) => label.trim()).filter(Boolean)
     : ["INBOX"];
 
-  const oauth2Client = createOAuth2Client();
-  oauth2Client.setCredentials({
-    access_token: account.accessToken,
-    refresh_token: account.refreshToken,
-  });
-
-  const gmail = google.gmail({
-    version: "v1",
-    auth: oauth2Client,
-  });
+  const gmail = createGmailClient(account);
 
   const response = await gmail.users.watch({
     userId: "me",
@@ -156,16 +191,7 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
     return;
   }
 
-  const oauth2Client = createOAuth2Client();
-  oauth2Client.setCredentials({
-    access_token: account.accessToken,
-    refresh_token: account.refreshToken,
-  });
-
-  const gmail = google.gmail({
-    version: "v1",
-    auth: oauth2Client,
-  });
+  const gmail = createGmailClient(account);
 
   const startHistoryId = account.lastHistoryId;
   if (!startHistoryId) {
@@ -252,51 +278,18 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
     const message = messageData?.data;
     if (!message) continue;
 
-    const headers = message.payload?.headers || [];
-    const subject = headers.find((h) => h.name === "Subject")?.value;
-    const from = headers.find((h) => h.name === "From")?.value;
-    const date = headers.find((h) => h.name === "Date")?.value;
-    const internalDateMs = Number(message.internalDate);
-    const receivedAt = Number.isFinite(internalDateMs)
-      ? new Date(internalDateMs)
-      : date
-      ? new Date(date)
-      : null;
+    const emailPayload = buildEmailPayloadFromMessage(message);
 
-    const result = await Email.updateOne(
-      { userId: account.userId, account: account.email, threadId: message.threadId },
-      {
-        account: account.email,
-        threadId: message.threadId,
-        subject,
-        from,
-        date,
-        receivedAt,
-        snippet: message.snippet,
-        userId: account.userId,
-        lastSyncedAt: new Date(),
-        syncSource: "incremental",
-      },
-      { upsert: true }
-    );
-
-    await publishSocketEvent(
-      "email-added",
-      {
-        account: account.email,
-        threadId: message.threadId,
-        subject,
-        from,
-        date,
-        receivedAt,
-        snippet: message.snippet,
-        isIncremental: true,
-      },
-      account.userId.toString()
-    );
+    const result = await upsertEmailAndPublish({
+      userId: account.userId,
+      accountEmail: account.email,
+      emailPayload,
+      syncSource: "incremental",
+      isIncremental: true,
+    });
     console.log("[gmail] Upserted message", {
       emailAddress,
-      threadId: message.threadId,
+      threadId: emailPayload?.threadId,
       upserted: result?.upsertedId ? true : false,
     });
   }
