@@ -6,66 +6,17 @@ import EmailAccount from "../models/EmailAccount.js";
 import { verifyPubSubJwt } from "../services/pubsubAuth.js";
 import { createGmailClient } from "../services/gmailClient.js";
 import { publishSocketEvent } from "../services/socketPubSub.js";
+import {
+  buildPlainText,
+  buildRawHtml,
+  buildSafeHtml,
+  decodeBase64UrlToBuffer,
+  extractMessageContent,
+  getHeaderValue,
+  normalizeContentId,
+} from "../services/emailContent.js";
 
 const gmailRouter = express.Router();
-
-const decodeBase64Url = (value) => {
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padding = normalized.length % 4;
-  const padded =
-    padding === 0 ? normalized : normalized + "=".repeat(4 - padding);
-  return Buffer.from(padded, "base64").toString("utf8");
-};
-
-const findPart = (payload, mimeType) => {
-  if (!payload) return null;
-  if (payload.mimeType === mimeType && payload.body?.data) {
-    return payload;
-  }
-  if (!payload.parts) return null;
-  for (const part of payload.parts) {
-    const found = findPart(part, mimeType);
-    if (found) return found;
-  }
-  return null;
-};
-
-function getEmailBody(payload) {
-  if (!payload) return { body: "", isHtml: false };
-  if (payload.body?.data) {
-    return {
-      body: decodeBase64Url(payload.body.data),
-      isHtml: payload.mimeType === "text/html",
-    };
-  }
-  const htmlPart = findPart(payload, "text/html");
-  if (htmlPart?.body?.data) {
-    return { body: decodeBase64Url(htmlPart.body.data), isHtml: true };
-  }
-  const textPart = findPart(payload, "text/plain");
-  if (textPart?.body?.data) {
-    return { body: decodeBase64Url(textPart.body.data), isHtml: false };
-  }
-  return { body: "", isHtml: false };
-}
-
-const stripHtmlToText = (html) => {
-  if (!html) return "";
-  const withoutScripts = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "");
-  const withBreaks = withoutScripts
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n");
-  return withBreaks
-    .replace(/<[^>]+>/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-};
-
-const getHeaderValue = (headers, name) =>
-  headers.find((header) => header.name === name)?.value;
 
 const resolveAccountForThread = async ({ userId, accountEmail, threadId }) => {
   if (accountEmail) {
@@ -77,6 +28,13 @@ const resolveAccountForThread = async ({ userId, accountEmail, threadId }) => {
     .lean();
   if (!emailRecord?.account) return null;
   return EmailAccount.findOne({ userId, email: emailRecord.account });
+};
+
+const sanitizeFilename = (value) => {
+  const cleaned = String(value || "attachment")
+    .replace(/[\r\n"]/g, "")
+    .trim();
+  return cleaned.length ? cleaned : "attachment";
 };
 
 function getDateRangeBounds(range, tzOffsetMinutes = 0) {
@@ -267,8 +225,67 @@ gmailRouter.get("/threads/:threadId", userAuth, async (req, res) => {
           ? new Date(date)
           : null;
         const labelIds = message.labelIds || [];
-        const { body, isHtml } = getEmailBody(message.payload);
-        const bodyText = isHtml ? stripHtmlToText(body) : body;
+
+        const content = extractMessageContent(message);
+
+        const attachments = content.attachments.map((attachment) => {
+          const filename = sanitizeFilename(attachment.filename);
+          const mimeType = attachment.mimeType || "application/octet-stream";
+          const disposition = attachment.inline ? "inline" : "attachment";
+
+          let url = null;
+          let dataUrl = null;
+
+          if (attachment.attachmentId) {
+            url = `/gmail/messages/${message.id}/attachments/${attachment.attachmentId}?account=${encodeURIComponent(
+              account.email
+            )}&mimeType=${encodeURIComponent(
+              mimeType
+            )}&filename=${encodeURIComponent(
+              filename
+            )}&disposition=${encodeURIComponent(disposition)}`;
+          } else if (attachment.data) {
+            const buffer = decodeBase64UrlToBuffer(attachment.data);
+            dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+          }
+
+          return {
+            ...attachment,
+            filename,
+            mimeType,
+            url,
+            dataUrl,
+          };
+        });
+
+        const inlineCidMap = attachments.reduce((acc, attachment) => {
+          if (attachment.inline && attachment.contentId) {
+            const inlineSrc = attachment.url || attachment.dataUrl;
+            if (inlineSrc) {
+              acc[normalizeContentId(attachment.contentId)] = inlineSrc;
+            }
+          }
+          return acc;
+        }, {});
+
+        const bodyHtml = buildSafeHtml({
+          html: content.html,
+          inlineCidMap,
+          stripImages: false,
+        });
+        const bodyHtmlNoImages = buildSafeHtml({
+          html: content.html,
+          inlineCidMap,
+          stripImages: true,
+        });
+        const bodyHtmlRaw = buildRawHtml({
+          html: content.html,
+          inlineCidMap,
+        });
+        const bodyText = buildPlainText({
+          text: content.text,
+          html: bodyHtmlNoImages || content.html,
+        });
 
         return {
           id: message.id,
@@ -279,9 +296,12 @@ gmailRouter.get("/threads/:threadId", userAuth, async (req, res) => {
           date,
           receivedAt,
           snippet: message.snippet,
-          body,
+          bodyHtml,
+          bodyHtmlNoImages,
+          bodyHtmlRaw,
           bodyText,
-          isHtml,
+          hasImages: content.hasImages,
+          attachments,
           isUnread: labelIds.includes("UNREAD"),
         };
       }
@@ -364,5 +384,59 @@ gmailRouter.patch("/threads/:threadId/read", userAuth, async (req, res) => {
     res.status(500).json({ message: "Failed to update read state" });
   }
 });
+
+gmailRouter.get(
+  "/messages/:messageId/attachments/:attachmentId",
+  userAuth,
+  async (req, res) => {
+    try {
+      const userId = req.user;
+      const { messageId, attachmentId } = req.params;
+      const accountEmail = req.query.account;
+      const mimeType =
+        req.query.mimeType || "application/octet-stream";
+      const filename = sanitizeFilename(req.query.filename);
+      const disposition =
+        req.query.disposition === "inline" ? "inline" : "attachment";
+
+      if (!accountEmail) {
+        return res.status(400).json({ message: "Missing account" });
+      }
+
+      const account = await EmailAccount.findOne({
+        userId,
+        email: accountEmail,
+      });
+
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      const gmail = createGmailClient(account);
+      const attachmentResponse = await gmail.users.messages.attachments.get({
+        userId: "me",
+        messageId,
+        id: attachmentId,
+      });
+
+      const data = attachmentResponse?.data?.data;
+      if (!data) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+
+      const buffer = decodeBase64UrlToBuffer(data);
+
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader(
+        "Content-Disposition",
+        `${disposition}; filename="${filename}"`
+      );
+      res.send(buffer);
+    } catch (error) {
+      console.error("[gmail] Attachment fetch failed", error?.message || error);
+      res.status(500).json({ message: "Failed to fetch attachment" });
+    }
+  }
+);
 
 export default gmailRouter;

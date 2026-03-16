@@ -1,15 +1,40 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Sora:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
-  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui;
+  --ink: #121417;
+  --muted: #5f6b7a;
+  --paper: #ffffff;
+  --canvas: #f4f2ef;
+  --accent: #1f2a44;
+  --accent-soft: #e6ecf7;
+  --border-soft: rgba(18, 20, 23, 0.08);
+  --font-body: "Sora", ui-sans-serif, system-ui;
+  --font-display: "Newsreader", "Sora", ui-serif, serif;
+  font-family: var(--font-body);
   color-scheme: light;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: rgba(31, 42, 68, 0.18);
 }
 
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -20,7 +45,7 @@
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
 
   to {
@@ -31,4 +56,53 @@
 
 .animate-fadeInUp {
   animation: fadeInUp 0.4s ease forwards;
+}
+
+.email-content {
+  word-break: break-word;
+}
+
+.email-content--clean {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #1f2937;
+}
+
+.email-content--original {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: inherit;
+}
+
+.email-content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.email-content table {
+  max-width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+}
+
+.email-content td,
+.email-content th {
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem;
+  vertical-align: top;
+}
+
+.email-content blockquote {
+  border-left: 3px solid #e5e7eb;
+  margin: 0.75rem 0;
+  padding-left: 0.75rem;
+  color: #6b7280;
+}
+
+.email-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }

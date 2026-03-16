@@ -146,5 +146,89 @@ userAuthRouter.get("/me", async (req, res) => {
   }
 });
 
+userAuthRouter.get("/preferences", userAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user).select(
+      "imageTrustedSenders densityPreference"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      imageTrustedSenders: user.imageTrustedSenders || [],
+      densityPreference: user.densityPreference || "comfortable",
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
+userAuthRouter.patch("/preferences", userAuth, async (req, res) => {
+  try {
+    const {
+      imageTrustedSenders,
+      addTrustedSender,
+      removeTrustedSender,
+      densityPreference,
+    } = req.body || {};
+
+    const updates = {};
+
+    if (Array.isArray(imageTrustedSenders)) {
+      updates.imageTrustedSenders = imageTrustedSenders
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter(Boolean);
+    } else {
+      const add = String(addTrustedSender || "")
+        .trim()
+        .toLowerCase();
+      const remove = String(removeTrustedSender || "")
+        .trim()
+        .toLowerCase();
+
+      const user = await User.findById(req.user).select(
+        "imageTrustedSenders densityPreference"
+      );
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const existing = new Set(
+        (user.imageTrustedSenders || [])
+          .map((value) => String(value || "").trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      if (add) existing.add(add);
+      if (remove) existing.delete(remove);
+
+      updates.imageTrustedSenders = Array.from(existing);
+    }
+
+    if (densityPreference) {
+      updates.densityPreference =
+        densityPreference === "compact" ? "compact" : "comfortable";
+    }
+
+    const updated = await User.findByIdAndUpdate(
+      req.user,
+      { $set: updates },
+      { new: true, select: "imageTrustedSenders densityPreference" }
+    );
+
+    res.json({
+      imageTrustedSenders: updated?.imageTrustedSenders || [],
+      densityPreference: updated?.densityPreference || "comfortable",
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+});
+
 
 export default userAuthRouter;

@@ -124,7 +124,7 @@ const Navbar = () => {
 
   return (
     <nav className="w-full">
-      <div className="mx-auto max-w-6xl rounded-2xl bg-white/90 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur px-4 py-3 sm:px-6 animate-[fadeUp_0.35s_ease-out]">
+      <div className="mx-auto max-w-7xl rounded-[26px] border border-black/5 bg-white/85 shadow-[0_14px_38px_rgba(15,23,42,0.08)] backdrop-blur px-4 py-3 sm:px-6 animate-[fadeUp_0.35s_ease-out]">
         {toast && (
           <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-emerald-200 bg-white shadow-[0_18px_50px_rgba(0,0,0,0.16)] p-4 animate-[fadeUp_0.25s_ease-out]">
             <div className="flex items-start gap-3">
@@ -162,32 +162,42 @@ const Navbar = () => {
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="h-11 w-11 rounded-full border border-neutral-200 bg-white grid place-items-center shadow-sm"
-            >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="h-11 w-11 rounded-full border border-black/5 bg-white grid place-items-center shadow-sm"
               >
-                <path d="M3 12h4l2-6 4 12 2-6h4" />
-              </svg>
-            </button>
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 12h4l2-6 4 12 2-6h4" />
+                </svg>
+              </button>
+              <div className="hidden sm:flex flex-col leading-tight">
+                <span className="font-display text-sm font-semibold text-neutral-900">
+                  AlphaMail
+                </span>
+                <span className="text-[11px] text-neutral-500">
+                  Focused inbox
+                </span>
+              </div>
+            </div>
 
-            <div className="flex items-center gap-1 rounded-full bg-neutral-100 p-1">
+            <div className="flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 border border-black/5">
               {["N", "D", "F"].map((label, idx) => (
                 <button
                   key={label}
                   type="button"
                   className={
                     idx === 0
-                      ? "h-8 w-8 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-sm"
+                      ? "h-8 w-8 rounded-lg bg-[var(--accent)] text-white text-sm font-semibold shadow-sm"
                       : "h-8 w-8 rounded-lg bg-white text-neutral-600 text-sm font-semibold"
                   }
                 >
@@ -198,7 +208,7 @@ const Navbar = () => {
           </div>
 
           <div className="flex-1 flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-[220px] flex items-center gap-2 rounded-full bg-neutral-100 px-4 py-2 text-neutral-500">
+            <div className="flex-1 min-w-[220px] flex items-center gap-2 rounded-full border border-black/5 bg-neutral-50/80 px-4 py-2 text-neutral-500">
               <svg
                 width="18"
                 height="18"
@@ -219,14 +229,14 @@ const Navbar = () => {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-sm"
             >
               Filters
             </button>
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-100"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[color:var(--accent)] ring-1 ring-[color:var(--accent-soft)]"
             >
               AI
             </button>
@@ -246,7 +256,7 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="h-11 w-11 rounded-full cursor-pointer bg-neutral-100 text-neutral-700 grid place-items-center font-semibold ring-1 ring-neutral-200"
+                className="h-11 w-11 rounded-full cursor-pointer bg-neutral-100/80 text-neutral-700 grid place-items-center font-semibold ring-1 ring-black/5"
                 aria-haspopup="menu"
                 aria-expanded={open}
               >
@@ -254,7 +264,7 @@ const Navbar = () => {
               </button>
 
               <div
-                className={`absolute right-0 mt-3 w-64 origin-top-right rounded-2xl border border-neutral-200 bg-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] transition-all duration-200 ${
+                className={`absolute right-0 mt-3 w-64 origin-top-right rounded-2xl border border-black/5 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
                   open
                     ? "scale-100 opacity-100 cursor-pointer translate-y-0"
                     : "pointer-events-none scale-95 opacity-0 -translate-y-1"
@@ -303,11 +313,11 @@ const Navbar = () => {
                               key={account._id || `${account.provider}-${account.email}`}
                               className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2"
                             >
-                              <div className="h-8 w-8 rounded-lg bg-blue-100 text-blue-700 grid place-items-center text-xs font-semibold">
-                                {(account.provider || "G")
-                                  .toUpperCase()
-                                  .slice(0, 1)}
-                              </div>
+                            <div className="h-8 w-8 rounded-lg bg-[var(--accent-soft)] text-[color:var(--accent)] grid place-items-center text-xs font-semibold">
+                              {(account.provider || "G")
+                                .toUpperCase()
+                                .slice(0, 1)}
+                            </div>
                               <div className="min-w-0 flex-1">
                                 <p className="text-xs font-semibold text-neutral-800 truncate">
                                   {account.provider === "gmail"
@@ -349,7 +359,7 @@ const Navbar = () => {
             <button
               type="button"
               onClick={handleConnectMail}
-              className="h-11 w-11 rounded-full bg-blue-600 text-white grid place-items-center shadow-md shadow-blue-200"
+              className="h-11 w-11 rounded-full bg-[var(--accent)] text-white grid place-items-center shadow-[0_12px_26px_rgba(31,42,68,0.28)]"
             >
               <svg
                 width="22"

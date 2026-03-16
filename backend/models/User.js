@@ -44,6 +44,17 @@ const userSchema = new mongoose.Schema(
           "Password must contain uppercase, lowercase, number and symbol",
       },
     },
+
+    imageTrustedSenders: {
+      type: [String],
+      default: [],
+    },
+
+    densityPreference: {
+      type: String,
+      enum: ["compact", "comfortable"],
+      default: "comfortable",
+    },
   },
   { timestamps: true }
 );
