@@ -1,21 +1,7 @@
-import { google } from "googleapis";
 import EmailAccount from "../models/EmailAccount.js";
 import Email from "../models/Email.js";
-import { createOAuth2Client } from "../routes/constants.js";
 import { publishSocketEvent } from "./socketPubSub.js";
-
-const createGmailClient = (account) => {
-  const oauth2Client = createOAuth2Client();
-  oauth2Client.setCredentials({
-    access_token: account.accessToken,
-    refresh_token: account.refreshToken,
-  });
-
-  return google.gmail({
-    version: "v1",
-    auth: oauth2Client,
-  });
-};
+import { createGmailClient } from "./gmailClient.js";
 
 const getHeaderValue = (headers, name) =>
   headers.find((header) => header.name === name)?.value;
@@ -24,6 +10,7 @@ const buildEmailPayloadFromMessage = (message, threadIdOverride) => {
   if (!message) return null;
 
   const headers = message.payload?.headers || [];
+  const labelIds = message.labelIds || [];
   const subject = getHeaderValue(headers, "Subject");
   const from = getHeaderValue(headers, "From");
   const date = getHeaderValue(headers, "Date");
@@ -35,12 +22,14 @@ const buildEmailPayloadFromMessage = (message, threadIdOverride) => {
     : null;
 
   return {
+    messageId: message.id,
     threadId: threadIdOverride || message.threadId,
     subject,
     from,
     date,
     receivedAt,
     snippet: message.snippet,
+    isUnread: labelIds.includes("UNREAD"),
   };
 };
 
@@ -63,6 +52,8 @@ const upsertEmailAndPublish = async ({
       date: emailPayload.date,
       receivedAt: emailPayload.receivedAt,
       snippet: emailPayload.snippet,
+      messageId: emailPayload.messageId,
+      isUnread: emailPayload.isUnread,
       userId,
       syncSource,
       lastSyncedAt: new Date(),
@@ -80,6 +71,8 @@ const upsertEmailAndPublish = async ({
       date: emailPayload.date,
       receivedAt: emailPayload.receivedAt,
       snippet: emailPayload.snippet,
+      messageId: emailPayload.messageId,
+      isUnread: emailPayload.isUnread,
       isIncremental,
     },
     userId.toString()
@@ -211,7 +204,7 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
     const historyParams = {
       userId: "me",
       startHistoryId,
-      historyTypes: ["messageAdded"],
+      historyTypes: ["messageAdded", "labelAdded", "labelRemoved"],
     };
 
     if (Array.isArray(account.watchLabels) && account.watchLabels.length === 1) {
@@ -238,11 +231,32 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
 
   const historyRecords = historyResponse?.data?.history || [];
   const messageIds = new Set();
+  const threadReadUpdates = new Map();
 
   historyRecords.forEach((record) => {
     (record.messagesAdded || []).forEach((entry) => {
       if (entry?.message?.id) {
         messageIds.add(entry.message.id);
+      }
+    });
+
+    (record.labelsAdded || []).forEach((entry) => {
+      if (
+        entry?.message?.threadId &&
+        Array.isArray(entry?.labelIds) &&
+        entry.labelIds.includes("UNREAD")
+      ) {
+        threadReadUpdates.set(entry.message.threadId, true);
+      }
+    });
+
+    (record.labelsRemoved || []).forEach((entry) => {
+      if (
+        entry?.message?.threadId &&
+        Array.isArray(entry?.labelIds) &&
+        entry.labelIds.includes("UNREAD")
+      ) {
+        threadReadUpdates.set(entry.message.threadId, false);
       }
     });
   });
@@ -254,7 +268,7 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
     latestHistoryId,
   });
 
-  if (messageIds.size === 0) {
+  if (messageIds.size === 0 && threadReadUpdates.size === 0) {
     console.log("[gmail] No new messages", { emailAddress });
     await EmailAccount.updateOne(
       { _id: account._id },
@@ -292,6 +306,22 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
       threadId: emailPayload?.threadId,
       upserted: result?.upsertedId ? true : false,
     });
+  }
+
+  for (const [threadId, isUnread] of threadReadUpdates.entries()) {
+    await Email.updateOne(
+      { userId: account.userId, account: account.email, threadId },
+      { isUnread }
+    );
+    await publishSocketEvent(
+      "email-updated",
+      {
+        account: account.email,
+        threadId,
+        isUnread,
+      },
+      account.userId.toString()
+    );
   }
 
   await EmailAccount.updateOne(

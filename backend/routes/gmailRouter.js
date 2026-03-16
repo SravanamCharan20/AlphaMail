@@ -2,28 +2,82 @@ import express from "express";
 import userAuth from "../middlewares/auth.js";
 import { emailQueue } from "../queues/emailQueue.js";
 import Email from "../models/Email.js";
+import EmailAccount from "../models/EmailAccount.js";
 import { verifyPubSubJwt } from "../services/pubsubAuth.js";
+import { createGmailClient } from "../services/gmailClient.js";
+import { publishSocketEvent } from "../services/socketPubSub.js";
 
 const gmailRouter = express.Router();
 
-function getEmailBody(payload) {
-  if (payload.body && payload.body.data) {
-    return Buffer.from(payload.body.data, "base64").toString("utf8");
-  }
-  if (payload.parts) {
-    for (const part of payload.parts) {
-      if (part.mimeType === "text/html" && part.body?.data) {
-        return Buffer.from(part.body.data, "base64").toString("utf8");
-      }
+const decodeBase64Url = (value) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = normalized.length % 4;
+  const padded =
+    padding === 0 ? normalized : normalized + "=".repeat(4 - padding);
+  return Buffer.from(padded, "base64").toString("utf8");
+};
 
-      if (part.mimeType === "text/plain" && part.body?.data) {
-        return Buffer.from(part.body.data, "base64").toString("utf8");
-      }
-    }
+const findPart = (payload, mimeType) => {
+  if (!payload) return null;
+  if (payload.mimeType === mimeType && payload.body?.data) {
+    return payload;
   }
-
+  if (!payload.parts) return null;
+  for (const part of payload.parts) {
+    const found = findPart(part, mimeType);
+    if (found) return found;
+  }
   return null;
+};
+
+function getEmailBody(payload) {
+  if (!payload) return { body: "", isHtml: false };
+  if (payload.body?.data) {
+    return {
+      body: decodeBase64Url(payload.body.data),
+      isHtml: payload.mimeType === "text/html",
+    };
+  }
+  const htmlPart = findPart(payload, "text/html");
+  if (htmlPart?.body?.data) {
+    return { body: decodeBase64Url(htmlPart.body.data), isHtml: true };
+  }
+  const textPart = findPart(payload, "text/plain");
+  if (textPart?.body?.data) {
+    return { body: decodeBase64Url(textPart.body.data), isHtml: false };
+  }
+  return { body: "", isHtml: false };
 }
+
+const stripHtmlToText = (html) => {
+  if (!html) return "";
+  const withoutScripts = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "");
+  const withBreaks = withoutScripts
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n");
+  return withBreaks
+    .replace(/<[^>]+>/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+const getHeaderValue = (headers, name) =>
+  headers.find((header) => header.name === name)?.value;
+
+const resolveAccountForThread = async ({ userId, accountEmail, threadId }) => {
+  if (accountEmail) {
+    return EmailAccount.findOne({ userId, email: accountEmail });
+  }
+  if (!threadId) return null;
+  const emailRecord = await Email.findOne({ userId, threadId })
+    .select("account")
+    .lean();
+  if (!emailRecord?.account) return null;
+  return EmailAccount.findOne({ userId, email: emailRecord.account });
+};
 
 function getDateRangeBounds(range, tzOffsetMinutes = 0) {
   if (!range || range === "all") return null;
@@ -174,6 +228,141 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
     limit,
     hasNext: page * limit < total,
   });
+});
+
+gmailRouter.get("/threads/:threadId", userAuth, async (req, res) => {
+  try {
+    const userId = req.user;
+    const { threadId } = req.params;
+    const accountEmail = req.query.account;
+
+    const account = await resolveAccountForThread({
+      userId,
+      accountEmail,
+      threadId,
+    });
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const gmail = createGmailClient(account);
+    const threadResponse = await gmail.users.threads.get({
+      userId: "me",
+      id: threadId,
+      format: "full",
+    });
+
+    const threadMessages = (threadResponse.data?.messages || []).map(
+      (message) => {
+        const headers = message.payload?.headers || [];
+        const subject = getHeaderValue(headers, "Subject");
+        const from = getHeaderValue(headers, "From");
+        const to = getHeaderValue(headers, "To");
+        const date = getHeaderValue(headers, "Date");
+        const internalDateMs = Number(message.internalDate);
+        const receivedAt = Number.isFinite(internalDateMs)
+          ? new Date(internalDateMs)
+          : date
+          ? new Date(date)
+          : null;
+        const labelIds = message.labelIds || [];
+        const { body, isHtml } = getEmailBody(message.payload);
+        const bodyText = isHtml ? stripHtmlToText(body) : body;
+
+        return {
+          id: message.id,
+          threadId: message.threadId,
+          subject,
+          from,
+          to,
+          date,
+          receivedAt,
+          snippet: message.snippet,
+          body,
+          bodyText,
+          isHtml,
+          isUnread: labelIds.includes("UNREAD"),
+        };
+      }
+    );
+
+    threadMessages.sort((a, b) => {
+      const aTime = a?.receivedAt ? new Date(a.receivedAt).getTime() : 0;
+      const bTime = b?.receivedAt ? new Date(b.receivedAt).getTime() : 0;
+      return aTime - bTime;
+    });
+
+    const threadIsUnread = threadMessages.some((msg) => msg.isUnread);
+    await Email.updateOne(
+      { userId, threadId, account: account.email },
+      { isUnread: threadIsUnread }
+    );
+
+    res.json({
+      threadId,
+      account: account.email,
+      isUnread: threadIsUnread,
+      messages: threadMessages,
+    });
+  } catch (error) {
+    console.error("[gmail] Thread fetch failed", error?.message || error);
+    res.status(500).json({ message: "Failed to load thread" });
+  }
+});
+
+gmailRouter.patch("/threads/:threadId/read", userAuth, async (req, res) => {
+  try {
+    const userId = req.user;
+    const { threadId } = req.params;
+    const accountEmail = req.query.account;
+    const unread = Boolean(req.body?.unread);
+
+    const account = await resolveAccountForThread({
+      userId,
+      accountEmail,
+      threadId,
+    });
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const gmail = createGmailClient(account);
+    const requestBody = unread
+      ? { addLabelIds: ["UNREAD"] }
+      : { removeLabelIds: ["UNREAD"] };
+
+    await gmail.users.threads.modify({
+      userId: "me",
+      id: threadId,
+      requestBody,
+    });
+
+    await Email.updateOne(
+      { userId, threadId, account: account.email },
+      { isUnread: unread }
+    );
+
+    await publishSocketEvent(
+      "email-updated",
+      {
+        account: account.email,
+        threadId,
+        isUnread: unread,
+      },
+      userId.toString()
+    );
+
+    res.json({
+      threadId,
+      account: account.email,
+      isUnread: unread,
+    });
+  } catch (error) {
+    console.error("[gmail] Update read state failed", error?.message || error);
+    res.status(500).json({ message: "Failed to update read state" });
+  }
 });
 
 export default gmailRouter;

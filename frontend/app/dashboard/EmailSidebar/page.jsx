@@ -3,12 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
 import EmailCards from "./components/EmailCards";
+import ThreadDetail from "./components/ThreadDetail";
 import socket from "../../utils/socket";
 import { apiFetch } from "../../utils/api";
 import {
   dedupeEmails,
   mergeEmails,
   sortEmails,
+  getThreadKey,
 } from "./emailUtils";
 import { matchesFilters } from "./filterUtils";
 
@@ -26,12 +28,17 @@ const EmailSidebar = () => {
   const [error, setError] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [newMailCount, setNewMailCount] = useState(0);
+  const [selectedThread, setSelectedThread] = useState(null);
+  const [threadMessages, setThreadMessages] = useState([]);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadError, setThreadError] = useState(null);
 
   const filtersRef = useRef({ account: "all", range: "all" });
   const lastFiltersRef = useRef({ account: "all", range: "all" });
   const pageRef = useRef(1);
   const fetchSeqRef = useRef(0);
   const fetchAbortRef = useRef(null);
+  const selectedThreadRef = useRef(null);
 
   const tzOffset = useMemo(() => -new Date().getTimezoneOffset(), []);
 
@@ -41,6 +48,10 @@ const EmailSidebar = () => {
   };
 
   useEffect(updateRefs, [accountFilter, dateRange, page]);
+
+  useEffect(() => {
+    selectedThreadRef.current = selectedThread;
+  }, [selectedThread]);
 
   const buildMessagesPath = (account, range, pageNumber, pageLimit) => {
     const params = new URLSearchParams();
@@ -57,6 +68,93 @@ const EmailSidebar = () => {
     params.set("tzOffset", String(tzOffset));
 
     return `/gmail/messages?${params.toString()}`;
+  };
+
+  const updateThreadUnread = (thread, unread) => {
+    if (!thread?.threadId) return;
+    setMessages((prev) =>
+      prev.map((mail) =>
+        mail.threadId === thread.threadId && mail.account === thread.account
+          ? { ...mail, isUnread: unread }
+          : mail
+      )
+    );
+    setSelectedThread((prev) =>
+      prev &&
+      prev.threadId === thread.threadId &&
+      prev.account === thread.account
+        ? { ...prev, isUnread: unread }
+        : prev
+    );
+    setThreadMessages((prev) =>
+      prev.map((msg) => ({ ...msg, isUnread: unread }))
+    );
+  };
+
+  const updateReadState = async (thread, unread) => {
+    if (!thread?.threadId || !thread?.account) return;
+    try {
+      const res = await apiFetch(
+        `/gmail/threads/${thread.threadId}/read?account=${encodeURIComponent(
+          thread.account
+        )}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ unread }),
+        }
+      );
+      if (!res.ok) {
+        console.warn("Failed to update read state");
+        return;
+      }
+      updateThreadUnread(thread, unread);
+    } catch (error) {
+      console.warn("Failed to update read state", error);
+    }
+  };
+
+  const fetchThreadDetails = async (thread) => {
+    if (!thread?.threadId || !thread?.account) return;
+    setThreadLoading(true);
+    setThreadError(null);
+    try {
+      const res = await apiFetch(
+        `/gmail/threads/${thread.threadId}?account=${encodeURIComponent(
+          thread.account
+        )}`
+      );
+      if (!res.ok) {
+        setThreadError("Failed to load conversation.");
+        setThreadMessages([]);
+        return;
+      }
+      const data = await res.json();
+      const msgs = Array.isArray(data.messages) ? data.messages : [];
+      setThreadMessages(msgs);
+      setSelectedThread((prev) =>
+        prev &&
+        prev.threadId === thread.threadId &&
+        prev.account === thread.account
+          ? {
+              ...prev,
+              account: data.account || prev.account,
+              isUnread: Boolean(data.isUnread),
+              subject: prev.subject || msgs[0]?.subject,
+              from: prev.from || msgs[0]?.from,
+            }
+          : prev
+      );
+
+      if (data.isUnread) {
+        updateReadState(thread, false);
+      }
+    } catch (error) {
+      console.warn("Failed to load thread", error);
+      setThreadError("Failed to load conversation.");
+    } finally {
+      setThreadLoading(false);
+    }
   };
 
   const fetchMessages = async (options = {}) => {
@@ -148,6 +246,11 @@ const EmailSidebar = () => {
   }, []);
 
   useEffect(() => {
+    if (!selectedThread) return;
+    fetchThreadDetails(selectedThread);
+  }, [selectedThread?.threadId, selectedThread?.account]);
+
+  useEffect(() => {
     const handleAccountsUpdate = () => {
       fetchAccounts();
       if (pageRef.current !== 1) {
@@ -184,10 +287,28 @@ const EmailSidebar = () => {
   }, [accountFilter, dateRange]);
 
   useEffect(() => {
+    setSelectedThread(null);
+    setThreadMessages([]);
+    setThreadError(null);
+  }, [accountFilter, dateRange]);
+
+  useEffect(() => {
     if (page === 1 && newMailCount !== 0) {
       setNewMailCount(0);
     }
   }, [page, newMailCount]);
+
+  const handleSelectThread = (mail) => {
+    if (!mail?.threadId || !mail?.account) return;
+    const nextThread = {
+      threadId: mail.threadId,
+      account: mail.account,
+      subject: mail.subject,
+      from: mail.from,
+      isUnread: mail.isUnread,
+    };
+    setSelectedThread(nextThread);
+  };
 
   useEffect(() => {
     // Socket connection
@@ -231,6 +352,15 @@ const EmailSidebar = () => {
       });
 
       setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
+
+      const activeThread = selectedThreadRef.current;
+      if (
+        activeThread &&
+        email.threadId === activeThread.threadId &&
+        email.account === activeThread.account
+      ) {
+        fetchThreadDetails(activeThread);
+      }
     });
 
     socket.on("sync-complete", () => {
@@ -240,12 +370,22 @@ const EmailSidebar = () => {
       }
     });
 
+    socket.on("email-updated", (update) => {
+      if (!update?.threadId || !update?.account) return;
+      const thread = {
+        threadId: update.threadId,
+        account: update.account,
+      };
+      updateThreadUnread(thread, Boolean(update.isUnread));
+    });
+
     return () => {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("sync-start");
       socket.off("email-added");
       socket.off("sync-complete");
+      socket.off("email-updated");
     };
   }, []);
 
@@ -258,8 +398,11 @@ const EmailSidebar = () => {
     ? Math.min(page * PAGE_SIZE, total)
     : (page - 1) * PAGE_SIZE + messages.length;
 
+  const selectedKey = selectedThread ? getThreadKey(selectedThread) : "";
+
   return (
-    <div className="border p-3 m-2 mt-12 w-1/4 min-h-screen bg-white">
+    <div className="mt-10 grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center gap-2">
           <h1 className="font-semibold text-lg">Inbox</h1>
@@ -358,7 +501,11 @@ const EmailSidebar = () => {
           No emails found for this filter.
         </div>
       ) : (
-        <EmailCards msgs={messages} />
+        <EmailCards
+          msgs={messages}
+          selectedKey={selectedKey}
+          onSelect={handleSelectThread}
+        />
       )}
 
       <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
@@ -395,6 +542,17 @@ const EmailSidebar = () => {
           </button>
         </div>
       </div>
+      </div>
+
+      <ThreadDetail
+        thread={selectedThread}
+        messages={threadMessages}
+        loading={threadLoading}
+        error={threadError}
+        onRetry={() => fetchThreadDetails(selectedThread)}
+        onMarkRead={() => updateReadState(selectedThread, false)}
+        onMarkUnread={() => updateReadState(selectedThread, true)}
+      />
     </div>
   );
 };

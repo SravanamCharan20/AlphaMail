@@ -15,6 +15,13 @@ export const getEmailSignature = (email) => {
   return `sig:${account}|${subject}|${from}|${date}|${snippet}`;
 };
 
+export const getThreadKey = (email) => {
+  if (!email) return "";
+  const account = email.account ?? "";
+  const threadId = email.threadId ?? "";
+  return `${account}::${threadId}`;
+};
+
 export const mergeEmails = (list, incoming) => {
   const seen = new Set();
   const merged = [];

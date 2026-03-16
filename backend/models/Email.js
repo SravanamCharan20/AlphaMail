@@ -8,11 +8,16 @@ const emailSchema = new mongoose.Schema(
     },
     threadId: String,
     account: String,
+    messageId: String,
     subject: String,
     from: String,
     date: String,
     receivedAt: Date,
     snippet: String,
+    isUnread: {
+      type: Boolean,
+      default: false,
+    },
     syncSource: {
       type: String,
       default: "initial",
@@ -25,5 +30,6 @@ const emailSchema = new mongoose.Schema(
 emailSchema.index({ userId: 1, receivedAt: -1 });
 emailSchema.index({ userId: 1, account: 1, receivedAt: -1 });
 emailSchema.index({ userId: 1, threadId: 1 });
+emailSchema.index({ userId: 1, isUnread: 1, receivedAt: -1 });
 
 export default mongoose.model("Email", emailSchema);
