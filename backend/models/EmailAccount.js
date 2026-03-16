@@ -20,6 +20,10 @@ const emailAccountSchema = new mongoose.Schema(
     refreshToken: String,
     tokenExpiry: Date,
     scopes: [String],
+    lastHistoryId: String,
+    watchExpiration: Date,
+    watchLabels: [String],
+    watchTopic: String,
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

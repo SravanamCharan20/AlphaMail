@@ -8,6 +8,7 @@ import Email from "../models/Email.js";
 import userAuth from "../middlewares/auth.js";
 import { SCOPES, createOAuth2Client } from "./constants.js";
 import { emailQueue } from "../queues/emailQueue.js";
+import { watchMailboxForAccount } from "../services/gmailService.js";
 dotenv.config();
 
 const googleAuthRouter = express.Router();
@@ -78,10 +79,23 @@ googleAuthRouter.get("/google/callback", async (req, res) => {
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
-    // get gmail profile
-    const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-    const profile = await gmail.users.getProfile({ userId: "me" });
-    const gmailAddress = profile?.data?.emailAddress;
+    let idTokenPayload = null;
+    if (tokens.id_token) {
+      try {
+        idTokenPayload = JSON.parse(
+          Buffer.from(tokens.id_token.split(".")[1], "base64").toString("utf-8")
+        );
+      } catch {
+        idTokenPayload = null;
+      }
+    }
+
+    let gmailAddress = idTokenPayload?.email || null;
+    if (!gmailAddress) {
+      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+      const profile = await gmail.users.getProfile({ userId: "me" });
+      gmailAddress = profile?.data?.emailAddress || null;
+    }
 
     if (!gmailAddress) {
       return res.status(400).json({ message: "Unable to read Gmail address" });
@@ -96,35 +110,39 @@ googleAuthRouter.get("/google/callback", async (req, res) => {
     if (tokens.access_token) update.accessToken = tokens.access_token;
     if (tokens.refresh_token) update.refreshToken = tokens.refresh_token;
     if (tokens.expiry_date) update.tokenExpiry = new Date(tokens.expiry_date);
-    if (tokens.id_token) {
-      try {
-        const payload = JSON.parse(
-          Buffer.from(tokens.id_token.split(".")[1], "base64").toString("utf-8")
-        );
-        if (payload?.sub) update.googleId = payload.sub;
-      } catch {
-        // ignore malformed id_token
-      }
+    if (idTokenPayload?.sub) {
+      update.googleId = idTokenPayload.sub;
     }
 
-    await EmailAccount.findOneAndUpdate(
+    const savedAccount = await EmailAccount.findOneAndUpdate(
       { userId: user._id, email: gmailAddress },
       update,
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    try {
-      await emailQueue.add("initial-sync-emails", {
-        userId: user._id,
-      });
-    } catch (queueError) {
-      console.error("Failed to enqueue initial sync:", queueError);
-    }
-
     const successUrl = `http://localhost:3000/oauth/success?provider=gmail&email=${encodeURIComponent(
       gmailAddress
     )}`;
-    return res.redirect(successUrl);
+    res.redirect(successUrl);
+
+    setImmediate(async () => {
+      try {
+        if (savedAccount) {
+          await watchMailboxForAccount(savedAccount);
+        }
+      } catch (watchError) {
+        console.error("Failed to start Gmail watch:", watchError);
+      }
+
+      try {
+        await emailQueue.add("initial-sync-emails", {
+          userId: user._id,
+        });
+      } catch (queueError) {
+        console.error("Failed to enqueue initial sync:", queueError);
+      }
+    });
+    return;
 
   } catch (err) {
     console.error("Error in OAuth callback:", {

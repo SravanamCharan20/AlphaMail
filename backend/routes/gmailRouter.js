@@ -2,6 +2,7 @@ import express from "express";
 import userAuth from "../middlewares/auth.js";
 import { emailQueue } from "../queues/emailQueue.js";
 import Email from "../models/Email.js";
+import { verifyPubSubJwt } from "../services/pubsubAuth.js";
 
 const gmailRouter = express.Router();
 
@@ -73,6 +74,55 @@ function getDateRangeBounds(range, tzOffsetMinutes = 0) {
 
   return null;
 }
+
+gmailRouter.post("/push", async (req, res) => {
+  try {
+    const audience = process.env.PUBSUB_PUSH_AUDIENCE;
+    const serviceAccount = process.env.PUBSUB_PUSH_SERVICE_ACCOUNT;
+    console.log("[pubsub] Push received");
+    await verifyPubSubJwt(req.headers.authorization, audience, serviceAccount);
+    console.log("[pubsub] JWT verified");
+
+    const message = req.body?.message;
+    if (!message?.data) {
+      console.warn("[pubsub] Missing data");
+      return res.status(400).json({ message: "Missing Pub/Sub data" });
+    }
+
+    let payload = null;
+    try {
+      payload = JSON.parse(
+        Buffer.from(message.data, "base64").toString("utf-8")
+      );
+    } catch {
+      console.warn("[pubsub] Invalid payload");
+      return res.status(400).json({ message: "Invalid Pub/Sub payload" });
+    }
+
+    const emailAddress = payload?.emailAddress;
+    const historyId = payload?.historyId;
+
+    if (!emailAddress || !historyId) {
+      console.warn("[pubsub] Missing emailAddress/historyId", payload);
+      return res.status(400).json({ message: "Missing Gmail payload data" });
+    }
+
+    console.log("[pubsub] Enqueue incremental sync", {
+      emailAddress,
+      historyId,
+    });
+    await emailQueue.add("incremental-sync", {
+      emailAddress,
+      historyId,
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error("[pubsub] Push failed", error?.message || error);
+    const status = error?.message?.includes("Authorization") ? 401 : 500;
+    return res.status(status).json({ message: "Pub/Sub push failed" });
+  }
+});
 
 // Adding Job into the emailQueue
 gmailRouter.post("/initial-sync", userAuth, async (req, res) => {

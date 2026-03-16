@@ -88,7 +88,12 @@ const EmailSidebar = () => {
       const data = await res.json();
       if (fetchSeqRef.current !== seq) return;
       const emails = Array.isArray(data.emails) ? data.emails : [];
-      const uniqueEmails = dedupeEmails(emails);
+      const uniqueEmails = dedupeEmails(emails).map((email) => {
+        if (email.syncSource === "incremental") {
+          return { ...email, syncSource: "incremental" };
+        }
+        return email;
+      });
 
       setMessages(uniqueEmails);
       setTotal(typeof data.total === "number" ? data.total : emails.length);
@@ -213,7 +218,16 @@ const EmailSidebar = () => {
       setMessages((prev) => {
         const merged = mergeEmails(prev, email);
         const sorted = sortEmails(merged);
-        return sorted.slice(0, PAGE_SIZE);
+        const next = sorted.slice(0, PAGE_SIZE);
+        if (email?.isIncremental) {
+          return next.map((item) =>
+            item.threadId === email.threadId &&
+            item.account === email.account
+              ? { ...item, syncSource: "incremental" }
+              : item
+          );
+        }
+        return next;
       });
 
       setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));

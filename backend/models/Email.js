@@ -13,6 +13,11 @@ const emailSchema = new mongoose.Schema(
     date: String,
     receivedAt: Date,
     snippet: String,
+    syncSource: {
+      type: String,
+      default: "initial",
+    },
+    lastSyncedAt: Date,
   },
   { timestamps: true }
 );

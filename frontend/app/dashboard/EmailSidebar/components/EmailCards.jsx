@@ -42,9 +42,16 @@ const EmailCards = ({ msgs }) => {
             <p className="text-sm font-semibold text-gray-900 line-clamp-2">
               {mail.subject || "No subject"}
             </p>
-            <span className="text-[11px] text-gray-500 whitespace-nowrap">
-              {formatDate(mail.receivedAt || mail.date) || "—"}
-            </span>
+            <div className="flex items-center gap-2">
+              {mail.syncSource === "incremental" || mail.isIncremental ? (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  New
+                </span>
+              ) : null}
+              <span className="text-[11px] text-gray-500 whitespace-nowrap">
+                {formatDate(mail.receivedAt || mail.date) || "—"}
+              </span>
+            </div>
           </div>
 
           <div className="mt-2 flex items-center gap-2">
