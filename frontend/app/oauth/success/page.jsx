@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { FiCheck } from "react-icons/fi";
 import { useSearchParams } from "next/navigation";
 
 const OAuthSuccess = () => {
@@ -25,18 +26,7 @@ const OAuthSuccess = () => {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ef_0%,_#f6f2ee_45%,_#efe7df_100%)] flex items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,0.12)] border border-neutral-200 p-6 text-center animate-[fadeUp_0.35s_ease-out]">
         <div className="mx-auto h-12 w-12 rounded-full bg-green-100 text-green-700 grid place-items-center">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
+          <FiCheck className="text-[24px]" />
         </div>
         <h1 className="mt-4 text-base font-semibold text-neutral-900">
           Connection complete

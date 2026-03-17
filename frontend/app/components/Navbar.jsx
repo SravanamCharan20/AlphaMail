@@ -1,6 +1,16 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import {
+  FiActivity,
+  FiCheck,
+  FiChevronDown,
+  FiLogOut,
+  FiMail,
+  FiPlus,
+  FiSearch,
+  FiUser,
+} from "react-icons/fi";
 import { useUser } from "../utils/userContext";
 import { API_BASE, apiFetch } from "../utils/api";
 
@@ -128,18 +138,7 @@ const Navbar = () => {
         <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-emerald-200 bg-white p-4 animate-[fadeUp_0.25s_ease-out]">
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
+              <FiCheck className="text-[20px]" />
             </div>
             <div>
               <p className="text-sm font-semibold text-neutral-900">
@@ -167,18 +166,7 @@ const Navbar = () => {
               className="h-9 w-9 rounded-full border border-black/5 bg-white/90 grid place-items-center shadow-sm"
               aria-label="AlphaMail home"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 12h4l2-6 4 12 2-6h4" />
-              </svg>
+              <FiActivity className="text-[18px]" />
             </button>
             <div className="hidden sm:flex flex-col leading-tight">
               <span className="font-display text-sm font-semibold text-neutral-900">
@@ -207,19 +195,7 @@ const Navbar = () => {
 
           <div className="hidden md:flex flex-1 items-center justify-center">
             <div className="flex w-[220px] items-center gap-2 rounded-full border border-black/5 bg-neutral-50/90 px-3 py-1.5 text-neutral-500">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.5-3.5" />
-              </svg>
+              <FiSearch className="text-[16px]" />
               <span className="text-[11px]">Search mail</span>
             </div>
           </div>
@@ -282,19 +258,7 @@ const Navbar = () => {
                     className="flex w-full items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2 text-left text-sm font-medium text-neutral-900"
                   >
                     <span className="h-8 w-8 rounded-lg bg-white shadow-sm grid place-items-center text-neutral-700">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M20 21a8 8 0 0 0-16 0" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
+                      <FiUser className="text-[16px]" />
                     </span>
                     Profile
                   </button>
@@ -305,28 +269,14 @@ const Navbar = () => {
                     aria-expanded={accountsOpen}
                   >
                     <span className="h-8 w-8 rounded-lg bg-neutral-100 grid place-items-center text-neutral-700">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M3 6h18v12H3z" />
-                        <path d="M3 7l9 6 9-6" />
-                      </svg>
+                      <FiMail className="text-[16px]" />
                     </span>
                     <span className="flex-1">Accounts</span>
-                    <span
-                      className={`text-neutral-400 transition-transform ${
+                    <FiChevronDown
+                      className={`text-[14px] text-neutral-400 transition-transform ${
                         accountsOpen ? "rotate-180" : ""
                       }`}
-                    >
-                      ▾
-                    </span>
+                    />
                   </button>
                   <div
                     className={`grid transition-all duration-200 ${
@@ -386,20 +336,7 @@ const Navbar = () => {
                     className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
                   >
                     <span className="h-8 w-8 rounded-lg bg-red-50 grid place-items-center text-red-600">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                        <path d="M16 17l5-5-5-5" />
-                        <path d="M21 12H9" />
-                      </svg>
+                      <FiLogOut className="text-[16px]" />
                     </span>
                     Sign out
                   </button>
@@ -413,18 +350,7 @@ const Navbar = () => {
               className="h-9 w-9 rounded-full bg-[var(--accent)] text-white grid place-items-center shadow-[0_12px_26px_rgba(31,42,68,0.28)]"
               aria-label="Connect account"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <FiPlus className="text-[18px]" />
             </button>
           </div>
         </div>

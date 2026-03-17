@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
+import { FiCalendar, FiChevronDown, FiInbox, FiMail } from "react-icons/fi";
 import EmailCards from "./components/EmailCards";
 import ThreadDetail from "./components/ThreadDetail";
 import socket from "../../utils/socket";
@@ -500,133 +501,90 @@ const EmailSidebar = () => {
   return (
     <>
       <div className="fixed left-4 sm:left-10 top-0 z-40 w-[calc(100%-2rem)] sm:w-[calc(100%-5rem)] lg:w-[300px] xl:w-[830px] 2xl:w-[460px]">
-        <div className="rounded-b-[30px] border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(255,255,255,0.86)_100%)] px-3.5 py-10.5 backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <h1 className="font-display text-base font-semibold">Inbox</h1>
-              <div
-                className="relative"
-                tabIndex={0}
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget)) {
-                    setAccountMenuOpen(false);
-                  }
-                }}
+        <div className="rounded-b-[32px] border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,255,255,0.9)_100%)] px-4 py-3.5 backdrop-blur">
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-[1.15rem] font-semibold text-gray-900">
+              Inbox
+            </h1>
+            <div
+              className="relative"
+              tabIndex={0}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setAccountMenuOpen(false);
+                }
+              }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setAccountMenuOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setDateMenuOpen(false);
+                    }
+                    return next;
+                  })
+                }
+                className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-white"
+                aria-haspopup="menu"
+                aria-expanded={accountMenuOpen}
               >
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAccountMenuOpen((prev) => {
-                      const next = !prev;
-                      if (next) {
-                        setDateMenuOpen(false);
-                      }
-                      return next;
-                    })
-                  }
-                  className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm"
-                  aria-haspopup="menu"
-                  aria-expanded={accountMenuOpen}
-                >
-                  <span className="text-[10px] uppercase tracking-wide text-gray-400">
-                    Account
-                  </span>
-                  <span className="max-w-[170px] truncate text-gray-700">
-                    {accountLabel}
-                  </span>
-                  <span
-                    className={`text-[10px] text-gray-500 transition ${
-                      accountMenuOpen ? "rotate-180" : ""
-                    }`}
-                  >
-                    ▾
-                  </span>
-                </button>
-                <div
-                  className={`absolute left-0 z-50 mt-2 w-64 origin-top-left rounded-2xl border border-black/5 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
-                    accountMenuOpen
-                      ? "scale-100 opacity-100"
-                      : "pointer-events-none scale-95 opacity-0 -translate-y-1"
+                <span className="text-[9px] uppercase tracking-[0.18em] text-gray-400">
+                  Account
+                </span>
+                <span className="max-w-[200px] truncate text-gray-700">
+                  {accountLabel}
+                </span>
+                <FiChevronDown
+                  className={`text-[14px] text-gray-500 transition ${
+                    accountMenuOpen ? "rotate-180" : ""
                   }`}
-                  role="menu"
-                >
-                  <div className="max-h-64 overflow-auto pr-1">
-                    {accountOptions.map((option) => {
-                      const isActive = accountFilter === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => handleAccountSelect(option.value)}
-                          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
-                            isActive
-                              ? "bg-neutral-100 text-neutral-900"
-                              : "text-neutral-700 hover:bg-neutral-50"
-                          }`}
-                          role="menuitem"
+                />
+              </button>
+              <div
+                className={`absolute left-0 z-50 mt-2 w-64 origin-top-left rounded-2xl border border-black/5 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                  accountMenuOpen
+                    ? "scale-100 opacity-100"
+                    : "pointer-events-none scale-95 opacity-0 -translate-y-1"
+                }`}
+                role="menu"
+              >
+                <div className="max-h-64 overflow-auto pr-1">
+                  {accountOptions.map((option) => {
+                    const isActive = accountFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleAccountSelect(option.value)}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                          isActive
+                            ? "bg-neutral-100 text-neutral-900"
+                            : "text-neutral-700 hover:bg-neutral-50"
+                        }`}
+                        role="menuitem"
+                      >
+                        <span
+                          className={`h-8 w-8 rounded-lg ${
+                            isActive ? "bg-white" : "bg-neutral-100"
+                          } grid place-items-center text-neutral-700`}
                         >
-                          <span
-                            className={`h-8 w-8 rounded-lg ${
-                              isActive ? "bg-white" : "bg-neutral-100"
-                            } grid place-items-center text-neutral-700`}
-                          >
-                            {option.type === "inbox" ? (
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.6"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M4 4h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4z" />
-                                <path d="M4 13h5l2 3h2l2-3h5" />
-                              </svg>
-                            ) : (
-                              <svg
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.6"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <rect x="3" y="5" width="18" height="14" rx="2" />
-                                <path d="M3 7l9 6 9-6" />
-                              </svg>
-                            )}
-                          </span>
-                          <span className="flex-1 truncate">
-                            {option.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          {option.type === "inbox" ? (
+                            <FiInbox className="text-[15px]" />
+                          ) : (
+                            <FiMail className="text-[15px]" />
+                          )}
+                        </span>
+                        <span className="flex-1 truncate">
+                          {option.label}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
-
-            <div className="flex items-center gap-2 text-[11px] text-gray-500">
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  syncing
-                    ? "bg-[var(--accent)] animate-pulse"
-                    : "bg-emerald-500"
-                }`}
-              />
-              <span>{syncing ? "Syncing" : "Up to date"}</span>
-              {syncing && (
-                <FaSpinner className="animate-spin text-[color:var(--accent)]" />
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
             <div
               className="relative"
               tabIndex={0}
@@ -647,21 +605,19 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm"
+                className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-white"
                 aria-haspopup="menu"
                 aria-expanded={dateMenuOpen}
               >
-                <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                <span className="text-[9px] uppercase tracking-[0.18em] text-gray-400">
                   Date
                 </span>
                 <span className="text-gray-700">{dateLabel}</span>
-                <span
-                  className={`text-[10px] text-gray-500 transition ${
+                <FiChevronDown
+                  className={`text-[14px] text-gray-500 transition ${
                     dateMenuOpen ? "rotate-180" : ""
                   }`}
-                >
-                  ▾
-                </span>
+                />
               </button>
               <div
                 className={`absolute left-0 z-50 mt-2 w-56 origin-top-left rounded-2xl border border-black/5 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
@@ -691,19 +647,7 @@ const EmailSidebar = () => {
                             isActive ? "bg-white" : "bg-neutral-100"
                           } grid place-items-center text-neutral-700`}
                         >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <rect x="3" y="4" width="18" height="18" rx="2" />
-                            <path d="M16 2v4M8 2v4M3 10h18" />
-                          </svg>
+                          <FiCalendar className="text-[15px]" />
                         </span>
                         <span className="flex-1">{option.label}</span>
                       </button>
@@ -712,49 +656,67 @@ const EmailSidebar = () => {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-3 py-1 text-[11px] font-semibold text-gray-600 shadow-sm">
-              <span>Emails: {total || messages.length}</span>
-            </div>
           </div>
         </div>
       </div>
 
       <div className="pt-6 grid min-h-0 gap-2 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[830px_minmax(0,1fr)] 2xl:grid-cols-[460px_minmax(0,1fr)] lg:h-[calc(100vh-10px)] lg:overflow-hidden">
-        <div className="mt-[-20px] flex min-h-0 flex-col pt-[120px] md:pt-[108px] lg:pt-[145px]">
+        <div className="mt-[-20px] flex min-h-0 flex-col gap-3 pt-[110px] md:pt-[104px] lg:pt-[57px]">
           <div className="flex flex-1 min-h-0 flex-col rounded-[24px] border border-black/5 bg-white/90 px-4 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)] backdrop-blur">
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-black/5 bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    syncing
+                      ? "bg-[var(--accent)] animate-pulse"
+                      : "bg-emerald-500"
+                  }`}
+                />
+                <span>{syncing ? "Syncing" : "Up to date"}</span>
+                {syncing && (
+                  <FaSpinner className="animate-spin text-[color:var(--accent)]" />
+                )}
+              </div>
+              <div className="flex items-center gap-1 text-gray-500">
+                <span>Emails:</span>
+                <span className="text-gray-700">
+                  {total || messages.length}
+                </span>
+              </div>
+            </div>
             <div className="flex-1 overflow-y-auto pr-1">
-            {newMailCount > 0 && page !== 1 && (
-              <button
-                type="button"
-                onClick={handleRefresh}
-                className="mb-3 w-full rounded-lg border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--accent)]"
-              >
-                {newMailCount} new messages · Refresh
-              </button>
-            )}
+              {newMailCount > 0 && page !== 1 && (
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  className="mb-3 w-full rounded-lg border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--accent)]"
+                >
+                  {newMailCount} new messages · Refresh
+                </button>
+              )}
 
-            {error && (
-              <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                {error}
-              </div>
-            )}
+              {error && (
+                <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {error}
+                </div>
+              )}
 
-            {loading ? (
-              <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
-                Loading messages...
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
-                No emails found for this filter.
-              </div>
-            ) : (
-              <EmailCards
-                msgs={messages}
-                selectedKey={selectedKey}
-                onSelect={handleSelectThread}
-              />
-            )}
-          </div>
+              {loading ? (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
+                  Loading messages...
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
+                  No emails found for this filter.
+                </div>
+              ) : (
+                <EmailCards
+                  msgs={messages}
+                  selectedKey={selectedKey}
+                  onSelect={handleSelectThread}
+                />
+              )}
+            </div>
 
           <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
             <span>
