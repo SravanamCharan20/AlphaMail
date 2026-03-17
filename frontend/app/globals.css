@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #121417;
+  --ink: #000000;
   --muted: #667085;
   --paper: #ffffff;
   --canvas: #f7f8fc;

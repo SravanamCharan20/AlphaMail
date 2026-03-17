@@ -818,13 +818,13 @@ const EmailSidebar = () => {
 
       <div className="flex min-h-0 flex-col gap-3">
         <div className="flex items-center justify-end">
-          <div className="flex flex-wrap items-center gap-1 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold text-gray-600 shadow-[0_8px_18px_rgba(99,102,241,0.12)]">
+          <div className="flex flex-wrap items-center gap-1 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-1.5 py-1.5 text-[11px] font-semibold text-gray-600 shadow-[0_8px_18px_rgba(99,102,241,0.12)]">
             <button
               type="button"
               onClick={() => setReadingMode("clean")}
-              className={`rounded-full px-2 py-0.5 transition ${
+              className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 readingMode === "clean"
-                  ? "bg-[linear-gradient(135deg,#6366f1_0%,#a855f7_100%)] text-white shadow-sm"
+                  ? "bg-black py-1 text-white shadow-sm"
                   : "text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
               }`}
             >
@@ -833,9 +833,9 @@ const EmailSidebar = () => {
             <button
               type="button"
               onClick={() => setReadingMode("raw")}
-              className={`rounded-full px-2 py-0.5 transition ${
+              className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 readingMode === "raw"
-                  ? "bg-[linear-gradient(135deg,#38bdf8_0%,#22d3ee_100%)] text-white shadow-sm"
+                  ? "bg-black py-1 text-white shadow-sm"
                   : "text-gray-600 hover:bg-sky-50 hover:text-sky-700"
               }`}
             >
@@ -850,7 +850,7 @@ const EmailSidebar = () => {
                   : updateReadState(selectedThread, true)
               }
               disabled={!selectedThread}
-              className={`rounded-full px-2 py-0.5 transition ${
+              className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 selectedThread
                   ? "text-gray-600 hover:bg-emerald-50 hover:text-emerald-700"
                   : "cursor-not-allowed text-gray-300"
@@ -862,10 +862,10 @@ const EmailSidebar = () => {
               type="button"
               onClick={() => setShowDetails((prev) => !prev)}
               disabled={!selectedThread}
-              className={`rounded-full px-2 py-0.5 transition ${
+              className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 selectedThread
                   ? showDetails
-                    ? "bg-amber-100 text-amber-700"
+                    ? "bg-amber-100 py-1 text-amber-700"
                     : "text-gray-600 hover:bg-amber-50 hover:text-amber-700"
                   : "cursor-not-allowed text-gray-300"
               }`}
