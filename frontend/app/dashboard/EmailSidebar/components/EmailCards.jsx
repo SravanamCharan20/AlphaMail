@@ -70,10 +70,6 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
               isSelected
                 ? "bg-[var(--accent-soft)]/60"
                 : "hover:bg-black/5"
-            } ${
-              mail.isUnread
-                ? "before:absolute before:left-0 before:top-3 before:bottom-3 before:w-[3px] before:rounded-full before:bg-[var(--accent)]"
-                : ""
             } border-b border-black/5 last:border-b-0`}
           >
             <div className="flex items-start gap-3">
@@ -98,31 +94,18 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                   >
                     {mail.subject || "No subject"}
                   </p>
-                  <span className="whitespace-nowrap text-[11px] text-gray-500">
+                  <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-gray-500">
+                    {mail.isUnread ? (
+                      <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+                    ) : null}
                     {formatDate(mail.receivedAt || mail.date) || "—"}
                   </span>
                 </div>
 
                 <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
-                  <span className="rounded-full border border-black/5 bg-white px-2 py-0.5 font-semibold text-gray-600">
-                    From: {getFromName(mail.from)}
-                  </span>
-                  {getToLabel(mail.to) ? (
-                    <span className="rounded-full border border-black/5 bg-white px-2 py-0.5 font-semibold text-gray-600">
-                      To: {getToLabel(mail.to)}
-                    </span>
-                  ) : null}
-                  <span className="rounded-full border border-black/5 bg-white px-2 py-0.5 font-semibold text-gray-600">
-                    {getProviderTag(mail.account)}
-                  </span>
                   {mail.newUntil && nowTs < mail.newUntil ? (
                     <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
                       New
-                    </span>
-                  ) : null}
-                  {mail.isUnread ? (
-                    <span className="rounded-full border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-2 py-0.5 font-semibold text-[color:var(--accent)]">
-                      Unread
                     </span>
                   ) : null}
                 </div>
@@ -134,6 +117,12 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                 >
                   {mail.snippet || "No preview available."}
                 </p>
+
+                <div className="mt-2">
+                  <span className="inline-flex items-center rounded-full border border-black/5 bg-white px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                    To: {getToLabel(mail.to) || mail.account || "Recipient"}
+                  </span>
+                </div>
               </div>
             </div>
           </button>

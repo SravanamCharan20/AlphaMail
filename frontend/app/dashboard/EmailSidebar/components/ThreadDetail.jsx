@@ -433,9 +433,9 @@ const ThreadDetail = ({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
-        className={`grid min-h-0 flex-1 gap-4 ${
+        className={`grid min-h-0 flex-1 gap-2 ${
           showDetails
-            ? "lg:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_240px]"
+            ? "lg:grid-cols-[minmax(0,1fr)_220px] xl:grid-cols-[minmax(0,1fr)_250px]"
             : "grid-cols-1"
         }`}
       >
@@ -726,44 +726,44 @@ const ThreadDetail = ({
         </div>
 
         {showDetails ? (
-          <aside className="min-h-0 overflow-y-auto rounded-[28px] border border-black/5 bg-white p-4 shadow-[0_16px_32px_rgba(15,23,42,0.05)]">
-            <div className="space-y-4 text-xs text-gray-600">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+          <aside className="min-h-0 overflow-y-auto rounded-[24px] border border-black/5 bg-white/90 px-4 py-3 text-xs text-gray-600 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                   Thread stats
                 </p>
-                <div className="mt-2 space-y-1">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span>Total messages</span>
-                    <span className="font-semibold text-gray-800">
+                    <span className="font-semibold text-gray-900">
                       {threadMeta.total}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Unread</span>
-                    <span className="font-semibold text-gray-800">
+                    <span className="font-semibold text-gray-900">
                       {threadMeta.unreadCount}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Attachments</span>
-                    <span className="font-semibold text-gray-800">
+                    <span className="font-semibold text-gray-900">
                       {threadMeta.attachments.length}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                   Participants
                 </p>
-                <div className="mt-2 flex flex-col gap-1">
+                <div className="space-y-1 text-[11px] text-gray-700">
                   {threadMeta.participants.length ? (
                     threadMeta.participants.map((participant) => (
-                      <span key={participant} className="truncate">
+                      <div key={participant} className="truncate">
                         {participant}
-                      </span>
+                      </div>
                     ))
                   ) : (
                     <span className="text-gray-400">No participants</span>
@@ -771,13 +771,13 @@ const ThreadDetail = ({
                 </div>
               </div>
 
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                   Image trust
                 </p>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    className={`rounded-full px-2 py-0.5 font-semibold ${
                       isTrustedSender
                         ? "bg-emerald-50 text-emerald-700"
                         : "bg-gray-100 text-gray-500"
@@ -801,11 +801,11 @@ const ThreadDetail = ({
                 </div>
               </div>
 
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                   Attachments
                 </p>
-                <div className="mt-2 flex flex-col gap-2">
+                <div className="space-y-2">
                   {threadMeta.attachments.length ? (
                     threadMeta.attachments.map((attachment, index) => {
                       const href = attachment.url || attachment.dataUrl;
@@ -816,12 +816,12 @@ const ThreadDetail = ({
                           href={href}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100"
+                          className="flex items-center justify-between gap-2 rounded-lg border border-black/5 bg-white/95 px-2.5 py-1.5 text-[11px] text-gray-700 hover:bg-gray-50"
                         >
-                          <span className="truncate">
+                          <span className="max-w-[150px] truncate font-semibold">
                             {attachment.filename}
                           </span>
-                          <span className="text-gray-400">
+                          <span className="text-[10px] text-gray-400">
                             {formatBytes(attachment.size)}
                           </span>
                         </a>
@@ -833,11 +833,11 @@ const ThreadDetail = ({
                 </div>
               </div>
 
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">
                   Links
                 </p>
-                <div className="mt-2 flex flex-col gap-1">
+                <div className="space-y-1 text-[11px]">
                   {threadMeta.links.length ? (
                     threadMeta.links.slice(0, 8).map((link) => (
                       <a
@@ -845,7 +845,7 @@ const ThreadDetail = ({
                         href={link}
                         target="_blank"
                         rel="noreferrer"
-                        className="truncate text-[11px] text-[color:var(--accent)] hover:underline"
+                        className="block truncate text-[color:var(--accent)] hover:underline"
                       >
                         {link}
                       </a>

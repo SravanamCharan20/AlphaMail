@@ -724,7 +724,7 @@ const EmailSidebar = () => {
         <div className="mt-[-20px] flex min-h-0 flex-col gap-3 pt-[110px] md:pt-[104px] lg:pt-[57px]">
           <div className="flex flex-1 min-h-0 flex-col rounded-[24px] border border-black/5 bg-white/90 px-4 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)] backdrop-blur">
             <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-black/5 bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm">
-              <div className="flex items-center gap-2">
+              <div className="border border-slate-400/50 p-1 px-2 rounded-2xl flex items-center gap-2">
                 <span
                   className={`h-2 w-2 rounded-full ${
                     syncing
