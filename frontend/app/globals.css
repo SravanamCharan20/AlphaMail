@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Faculty+Glyphic&family=Nunito:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -9,8 +9,8 @@
   --accent: #1f2a44;
   --accent-soft: #e6ecf7;
   --border-soft: rgba(18, 20, 23, 0.08);
-  --font-body: "Nunito", ui-sans-serif, system-ui;
-  --font-display: "Faculty Glyphic", "Nunito", ui-serif, serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui;
+  --font-display: "IBM Plex Mono", "IBM Plex Sans", ui-monospace, monospace;
   font-family: var(--font-body);
   color-scheme: light;
 }

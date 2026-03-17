@@ -33,6 +33,8 @@ const EmailSidebar = () => {
   const [readingMode, setReadingMode] = useState("clean");
   const [showDetails, setShowDetails] = useState(false);
   const [trustedSenders, setTrustedSenders] = useState([]);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
 
   const filtersRef = useRef({ account: "all", range: "all" });
   const lastFiltersRef = useRef({ account: "all", range: "all" });
@@ -458,42 +460,153 @@ const EmailSidebar = () => {
     : (page - 1) * pageSize + messages.length;
 
   const selectedKey = selectedThread ? getThreadKey(selectedThread) : "";
+  const accountLabel = accountFilter === "all" ? "All inbox" : accountFilter;
+  const dateLabels = {
+    all: "All time",
+    today: "Today",
+    yesterday: "Yesterday",
+    week: "Last 7 days",
+    month: "Last 30 days",
+  };
+  const dateLabel = dateLabels[dateRange] || "All time";
+  const accountOptions = [
+    { value: "all", label: "All inbox", type: "inbox" },
+    ...accounts.map((account) => ({
+      value: account.email,
+      label: account.email,
+      provider: account.provider || "Mail",
+    })),
+  ];
+  const dateOptions = [
+    { value: "all", label: "All time" },
+    { value: "today", label: "Today" },
+    { value: "yesterday", label: "Yesterday" },
+    { value: "week", label: "Last 7 days" },
+    { value: "month", label: "Last 30 days" },
+  ];
+
+  const handleAccountSelect = (value) => {
+    setPage(1);
+    setAccountFilter(value);
+    setAccountMenuOpen(false);
+  };
+
+  const handleDateSelect = (value) => {
+    setPage(1);
+    setDateRange(value);
+    setDateMenuOpen(false);
+  };
 
   return (
-    <div className="mt-1 grid min-h-0 gap-5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)] 2xl:grid-cols-[360px_minmax(0,1fr)] lg:h-[calc(100vh-150px)] lg:overflow-hidden">
-      <div className="flex min-h-0 flex-col gap-3">
-        <div className="rounded-[22px] border border-black/5 bg-white/90 px-4 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur">
+    <>
+      <div className="fixed left-4 sm:left-10 top-0 z-40 w-[calc(100%-2rem)] sm:w-[calc(100%-5rem)] lg:w-[300px] xl:w-[830px] 2xl:w-[460px]">
+        <div className="rounded-b-[30px] border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(255,255,255,0.86)_100%)] px-3.5 py-10.5 backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <h1 className="font-display text-base font-semibold">Inbox</h1>
-              <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm">
-                <span className="text-[10px] uppercase tracking-wide text-gray-400">
-                  Account
-                </span>
-                <div className="relative">
-                  <select
-                    value={accountFilter}
-                    onChange={(event) => {
-                      setPage(1);
-                      setAccountFilter(event.target.value);
-                    }}
-                    className="max-w-[170px] appearance-none bg-transparent pr-5 text-[11px] font-semibold text-gray-700 focus:outline-none truncate"
+              <div
+                className="relative"
+                tabIndex={0}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setAccountMenuOpen(false);
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAccountMenuOpen((prev) => {
+                      const next = !prev;
+                      if (next) {
+                        setDateMenuOpen(false);
+                      }
+                      return next;
+                    })
+                  }
+                  className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm"
+                  aria-haspopup="menu"
+                  aria-expanded={accountMenuOpen}
+                >
+                  <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                    Account
+                  </span>
+                  <span className="max-w-[170px] truncate text-gray-700">
+                    {accountLabel}
+                  </span>
+                  <span
+                    className={`text-[10px] text-gray-500 transition ${
+                      accountMenuOpen ? "rotate-180" : ""
+                    }`}
                   >
-                    <option value="all">All inbox</option>
-                    {accounts.map((account) => (
-                      <option
-                        key={
-                          account._id || `${account.provider}-${account.email}`
-                        }
-                        value={account.email}
-                      >
-                        {account.email}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
                     ▾
                   </span>
+                </button>
+                <div
+                  className={`absolute left-0 z-50 mt-2 w-64 origin-top-left rounded-2xl border border-black/5 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                    accountMenuOpen
+                      ? "scale-100 opacity-100"
+                      : "pointer-events-none scale-95 opacity-0 -translate-y-1"
+                  }`}
+                  role="menu"
+                >
+                  <div className="max-h-64 overflow-auto pr-1">
+                    {accountOptions.map((option) => {
+                      const isActive = accountFilter === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => handleAccountSelect(option.value)}
+                          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                            isActive
+                              ? "bg-neutral-100 text-neutral-900"
+                              : "text-neutral-700 hover:bg-neutral-50"
+                          }`}
+                          role="menuitem"
+                        >
+                          <span
+                            className={`h-8 w-8 rounded-lg ${
+                              isActive ? "bg-white" : "bg-neutral-100"
+                            } grid place-items-center text-neutral-700`}
+                          >
+                            {option.type === "inbox" ? (
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M4 4h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4z" />
+                                <path d="M4 13h5l2 3h2l2-3h5" />
+                              </svg>
+                            ) : (
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect x="3" y="5" width="18" height="14" rx="2" />
+                                <path d="M3 7l9 6 9-6" />
+                              </svg>
+                            )}
+                          </span>
+                          <span className="flex-1 truncate">
+                            {option.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -513,29 +626,90 @@ const EmailSidebar = () => {
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
-            <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm">
-              <span className="text-[10px] uppercase tracking-wide text-gray-400">
-                Date
-              </span>
-              <div className="relative">
-                <select
-                  value={dateRange}
-                  onChange={(event) => {
-                    setPage(1);
-                    setDateRange(event.target.value);
-                  }}
-                  className="appearance-none bg-transparent pr-5 text-[11px] font-semibold text-gray-700 focus:outline-none"
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+            <div
+              className="relative"
+              tabIndex={0}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setDateMenuOpen(false);
+                }
+              }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  setDateMenuOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setAccountMenuOpen(false);
+                    }
+                    return next;
+                  })
+                }
+                className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm"
+                aria-haspopup="menu"
+                aria-expanded={dateMenuOpen}
+              >
+                <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                  Date
+                </span>
+                <span className="text-gray-700">{dateLabel}</span>
+                <span
+                  className={`text-[10px] text-gray-500 transition ${
+                    dateMenuOpen ? "rotate-180" : ""
+                  }`}
                 >
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="yesterday">Yesterday</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                </select>
-                <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
                   ▾
                 </span>
+              </button>
+              <div
+                className={`absolute left-0 z-50 mt-2 w-56 origin-top-left rounded-2xl border border-black/5 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                  dateMenuOpen
+                    ? "scale-100 opacity-100"
+                    : "pointer-events-none scale-95 opacity-0 -translate-y-1"
+                }`}
+                role="menu"
+              >
+                <div className="space-y-1">
+                  {dateOptions.map((option) => {
+                    const isActive = dateRange === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleDateSelect(option.value)}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                          isActive
+                            ? "bg-neutral-100 text-neutral-900"
+                            : "text-neutral-700 hover:bg-neutral-50"
+                        }`}
+                        role="menuitem"
+                      >
+                        <span
+                          className={`h-8 w-8 rounded-lg ${
+                            isActive ? "bg-white" : "bg-neutral-100"
+                          } grid place-items-center text-neutral-700`}
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <rect x="3" y="4" width="18" height="18" rx="2" />
+                            <path d="M16 2v4M8 2v4M3 10h18" />
+                          </svg>
+                        </span>
+                        <span className="flex-1">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-3 py-1 text-[11px] font-semibold text-gray-600 shadow-sm">
@@ -543,9 +717,12 @@ const EmailSidebar = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex flex-1 min-h-0 flex-col rounded-[24px] border border-black/5 bg-white/90 px-4 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)] backdrop-blur">
-          <div className="flex-1 overflow-y-auto pr-1">
+      <div className="pt-6 grid min-h-0 gap-2 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[830px_minmax(0,1fr)] 2xl:grid-cols-[460px_minmax(0,1fr)] lg:h-[calc(100vh-10px)] lg:overflow-hidden">
+        <div className="mt-[-20px] flex min-h-0 flex-col pt-[120px] md:pt-[108px] lg:pt-[145px]">
+          <div className="flex flex-1 min-h-0 flex-col rounded-[24px] border border-black/5 bg-white/90 px-4 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)] backdrop-blur">
+            <div className="flex-1 overflow-y-auto pr-1">
             {newMailCount > 0 && page !== 1 && (
               <button
                 type="button"
@@ -689,6 +866,7 @@ const EmailSidebar = () => {
         />
       </div>
     </div>
+    </>
   );
 };
 

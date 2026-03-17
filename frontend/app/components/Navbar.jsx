@@ -119,13 +119,13 @@ const Navbar = () => {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, []);
-  
+
   if (loading && !user) return null;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50">
+    <nav className="fixed top-0 left-1/2 -translate-x-1/2 z-50">
       {toast && (
-        <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-emerald-200 bg-white shadow-[0_18px_50px_rgba(0,0,0,0.16)] p-4 animate-[fadeUp_0.25s_ease-out]">
+        <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-emerald-200 bg-white p-4 animate-[fadeUp_0.25s_ease-out]">
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center">
               <svg
@@ -159,226 +159,273 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="flex justify-center px-3">
-        <div className="w-[min(94vw,700px)] rounded-b-[30px] border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(255,255,255,0.86)_100%)] shadow-[0_16px_34px_rgba(15,23,42,0.12)] backdrop-blur px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="h-9 w-9 rounded-full border border-black/5 bg-white/90 grid place-items-center shadow-sm"
-                aria-label="AlphaMail home"
+      <div className="w-[min(94vw,700px)] px-3 rounded-b-[30px] border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(255,255,255,0.86)_100%)] backdrop-blur px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out]">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="h-9 w-9 rounded-full border border-black/5 bg-white/90 grid place-items-center shadow-sm"
+              aria-label="AlphaMail home"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 12h4l2-6 4 12 2-6h4" />
-                </svg>
-              </button>
-              <div className="hidden sm:flex flex-col leading-tight">
-                <span className="font-display text-sm font-semibold text-neutral-900">
-                  AlphaMail
-                </span>
-                <span className="text-[10px] text-neutral-500">
-                  Focused inbox
-                </span>
-              </div>
-              <div className="hidden lg:flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 border border-black/5">
-                {["N", "D", "F"].map((label, idx) => (
-                  <button
-                    key={label}
-                    type="button"
-                    className={
-                      idx === 0
-                        ? "h-7 w-7 rounded-lg bg-[var(--accent)] text-white text-xs font-semibold shadow-sm"
-                        : "h-7 w-7 rounded-lg bg-white text-neutral-600 text-xs font-semibold"
-                    }
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+                <path d="M3 12h4l2-6 4 12 2-6h4" />
+              </svg>
+            </button>
+            <div className="hidden sm:flex flex-col leading-tight">
+              <span className="font-display text-sm font-semibold text-neutral-900">
+                AlphaMail
+              </span>
+              <span className="text-[10px] text-neutral-500">
+                Focused inbox
+              </span>
             </div>
-
-            <div className="hidden md:flex flex-1 items-center justify-center">
-              <div className="flex w-[220px] items-center gap-2 rounded-full border border-black/5 bg-neutral-50/90 px-3 py-1.5 text-neutral-500">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+            <div className="hidden lg:flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 border border-black/5">
+              {["N", "D", "F"].map((label, idx) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={
+                    idx === 0
+                      ? "h-7 w-7 rounded-lg bg-[var(--accent)] text-white text-xs font-semibold shadow-sm"
+                      : "h-7 w-7 rounded-lg bg-white text-neutral-600 text-xs font-semibold"
+                  }
                 >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
-                <span className="text-[11px]">Search mail</span>
-              </div>
+                  {label}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="flex items-center gap-2">
+          <div className="hidden md:flex flex-1 items-center justify-center">
+            <div className="flex w-[220px] items-center gap-2 rounded-full border border-black/5 bg-neutral-50/90 px-3 py-1.5 text-neutral-500">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <span className="text-[11px]">Search mail</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-3 py-1.5 text-[11px] font-semibold text-neutral-700 shadow-sm"
+              aria-label="Filters"
+            >
+              <span className="hidden sm:inline">Filters</span>
+              <span className="sm:hidden">⋯</span>
+            </button>
+
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--accent)] ring-1 ring-[color:var(--accent-soft)]"
+            >
+              AI
+            </button>
+
+            <div
+              className="relative"
+              tabIndex={0}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                  setOpen(false);
+                  setAccountsOpen(false);
+                }
+              }}
+            >
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-3 py-1.5 text-[11px] font-semibold text-neutral-700 shadow-sm"
-                aria-label="Filters"
+                onClick={() => setOpen((prev) => !prev)}
+                className="h-9 w-9 rounded-full cursor-pointer bg-neutral-100/80 text-neutral-700 grid place-items-center text-xs font-semibold ring-1 ring-black/5"
+                aria-haspopup="menu"
+                aria-expanded={open}
               >
-                <span className="hidden sm:inline">Filters</span>
-                <span className="sm:hidden">⋯</span>
-              </button>
-
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--accent)] ring-1 ring-[color:var(--accent-soft)]"
-              >
-                AI
+                {initials}
               </button>
 
               <div
-                className="relative"
-                tabIndex={0}
-                onBlur={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget)) {
-                    setOpen(false);
-                    setAccountsOpen(false);
-                  }
-                }}
+                className={`absolute right-0 mt-3 w-64 origin-top-right rounded-2xl border border-black/5 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                  open
+                    ? "scale-100 opacity-100 cursor-pointer translate-y-0"
+                    : "pointer-events-none scale-95 opacity-0 -translate-y-1"
+                }`}
               >
-                <button
-                  type="button"
-                  onClick={() => setOpen((prev) => !prev)}
-                  className="h-9 w-9 rounded-full cursor-pointer bg-neutral-100/80 text-neutral-700 grid place-items-center text-xs font-semibold ring-1 ring-black/5"
-                  aria-haspopup="menu"
-                  aria-expanded={open}
-                >
-                  {initials}
-                </button>
-
-                <div
-                  className={`absolute right-0 mt-3 w-64 origin-top-right rounded-2xl border border-black/5 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
-                    open
-                      ? "scale-100 opacity-100 cursor-pointer translate-y-0"
-                      : "pointer-events-none scale-95 opacity-0 -translate-y-1"
-                  }`}
-                >
-                  <div className="px-4 pt-4 pb-3">
-                    <p className="text-sm font-semibold text-neutral-800">
-                      {user?.username ?? "Profile"}
-                    </p>
-                    <p className="text-xs text-neutral-500">
-                      {user?.email ?? "you@alphamail.com"}
-                    </p>
-                  </div>
-                  <div className="border-t border-neutral-100 py-2">
-                    <button
-                      type="button"
-                      className="w-full px-4 py-2 text-left cursor-pointer text-sm text-neutral-700 hover:bg-neutral-50"
-                    >
-                      View profile
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAccountsOpen((prev) => !prev)}
-                      className="w-full px-4 py-2 text-left cursor-pointer text-sm text-neutral-700 hover:bg-neutral-50 flex items-center justify-between"
-                      aria-expanded={accountsOpen}
-                    >
-                      Accounts
-                      <span
-                        className={`text-neutral-400 transition-transform ${
-                          accountsOpen ? "rotate-180" : ""
-                        }`}
+                <div className="px-4 pt-4 pb-3 border-b border-neutral-100">
+                  <p className="text-sm font-semibold text-neutral-800">
+                    {user?.username ?? "Profile"}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {user?.email ?? "you@alphamail.com"}
+                  </p>
+                </div>
+                <div className="p-2">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2 text-left text-sm font-medium text-neutral-900"
+                  >
+                    <span className="h-8 w-8 rounded-lg bg-white shadow-sm grid place-items-center text-neutral-700">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        ▾
-                      </span>
-                    </button>
-                    <div
-                      className={`grid transition-all duration-200 ${
-                        accountsOpen
-                          ? "grid-rows-[1fr] opacity-100"
-                          : "grid-rows-[0fr] opacity-0"
+                        <path d="M20 21a8 8 0 0 0-16 0" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </span>
+                    Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccountsOpen((prev) => !prev)}
+                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                    aria-expanded={accountsOpen}
+                  >
+                    <span className="h-8 w-8 rounded-lg bg-neutral-100 grid place-items-center text-neutral-700">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18v12H3z" />
+                        <path d="M3 7l9 6 9-6" />
+                      </svg>
+                    </span>
+                    <span className="flex-1">Accounts</span>
+                    <span
+                      className={`text-neutral-400 transition-transform ${
+                        accountsOpen ? "rotate-180" : ""
                       }`}
                     >
-                      <div className="overflow-hidden">
-                        <div className="px-4 pb-3 pt-1 space-y-2 max-h-48 overflow-auto pr-1">
-                          {accounts.length > 0 ? (
-                            accounts.map((account) => (
-                              <div
-                                key={account._id || `${account.provider}-${account.email}`}
-                                className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2"
-                              >
-                                <div className="h-8 w-8 rounded-lg bg-[var(--accent-soft)] text-[color:var(--accent)] grid place-items-center text-xs font-semibold">
-                                  {(account.provider || "G")
-                                    .toUpperCase()
-                                    .slice(0, 1)}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-xs font-semibold text-neutral-800 truncate">
-                                    {account.provider === "gmail"
-                                      ? "Gmail"
-                                      : account.provider}
-                                  </p>
-                                  <p className="text-[11px] text-neutral-500 truncate">
-                                    {account.email}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleDisconnectAccount(account)
-                                  }
-                                  className="rounded-full border border-neutral-200 bg-white px-2 py-1 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-100"
-                                >
-                                  Disconnect
-                                </button>
+                      ▾
+                    </span>
+                  </button>
+                  <div
+                    className={`grid transition-all duration-200 ${
+                      accountsOpen
+                        ? "grid-rows-[1fr] opacity-100"
+                        : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="px-3 pb-2 pt-2 space-y-2 max-h-48 overflow-auto pr-1">
+                        {accounts.length > 0 ? (
+                          accounts.map((account) => (
+                            <div
+                              key={
+                                account._id ||
+                                `${account.provider}-${account.email}`
+                              }
+                              className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2"
+                            >
+                              <div className="h-8 w-8 rounded-lg bg-[var(--accent-soft)] text-[color:var(--accent)] grid place-items-center text-xs font-semibold">
+                                {(account.provider || "G")
+                                  .toUpperCase()
+                                  .slice(0, 1)}
                               </div>
-                            ))
-                          ) : (
-                            <div className="text-xs text-neutral-500">
-                              No accounts connected yet.
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-semibold text-neutral-800 truncate">
+                                  {account.provider === "gmail"
+                                    ? "Gmail"
+                                    : account.provider}
+                                </p>
+                                <p className="text-[11px] text-neutral-500 truncate">
+                                  {account.email}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDisconnectAccount(account)}
+                                className="rounded-full border border-neutral-200 bg-white px-2 py-1 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-100"
+                              >
+                                Disconnect
+                              </button>
                             </div>
-                          )}
-                        </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-neutral-500">
+                            No accounts connected yet.
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full px-4 py-2 cursor-pointer text-left text-sm text-red-600 hover:bg-red-50"
-                    >
-                      Logout
-                    </button>
                   </div>
                 </div>
+                <div className="border-t border-neutral-100 p-2">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <span className="h-8 w-8 rounded-lg bg-red-50 grid place-items-center text-red-600">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <path d="M16 17l5-5-5-5" />
+                        <path d="M21 12H9" />
+                      </svg>
+                    </span>
+                    Sign out
+                  </button>
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={handleConnectMail}
-                className="h-9 w-9 rounded-full bg-[var(--accent)] text-white grid place-items-center shadow-[0_12px_26px_rgba(31,42,68,0.28)]"
-                aria-label="Connect account"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleConnectMail}
+              className="h-9 w-9 rounded-full bg-[var(--accent)] text-white grid place-items-center shadow-[0_12px_26px_rgba(31,42,68,0.28)]"
+              aria-label="Connect account"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
