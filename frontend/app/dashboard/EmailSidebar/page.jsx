@@ -560,8 +560,8 @@ const EmailSidebar = () => {
 
   return (
     <>
-      <div className="fixed left-4 sm:left-10 top-0 z-40 w-[calc(100%-2rem)] sm:w-[calc(100%-5rem)] lg:w-[300px] xl:w-[830px] 2xl:w-[460px]">
-        <div className="rounded-b-[32px] border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,255,255,0.9)_100%)] px-4 py-3.5 backdrop-blur">
+      <div className="fixed left-4 sm:left-10 top-0 z-40 w-[calc(100%-rem)] sm:w-[calc(100%-2rem)] lg:w-[220px] xl:w-[830px] 2xl:w-[460px]">
+        <div className="rounded-b-[28px] border border-black/10 bg-white/70 px-3 py-3.5 backdrop-blur shadow-[0_20px_60px_rgba(0,0,0,0.10)]">
           <div className="flex items-center gap-3">
             <h1 className="font-display text-[1.15rem] font-semibold text-gray-900">
               Inbox
@@ -586,7 +586,7 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-700"
+                className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={accountMenuOpen}
               >
@@ -603,7 +603,7 @@ const EmailSidebar = () => {
                 />
               </button>
               <div
-                className={`absolute left-0 z-50 mt-2 w-64 origin-top-left rounded-2xl border border-black/5 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                className={`absolute left-0 z-50 mt-2 w-64 origin-top-left rounded-2xl border border-black/10 bg-white/90 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.12)] backdrop-blur transition-all duration-200 ${
                   accountMenuOpen
                     ? "scale-100 opacity-100"
                     : "pointer-events-none scale-95 opacity-0 -translate-y-1"
@@ -665,7 +665,7 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-sky-50 hover:text-sky-700"
+                className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={dateMenuOpen}
               >
@@ -680,7 +680,7 @@ const EmailSidebar = () => {
                 />
               </button>
               <div
-                className={`absolute left-0 z-50 mt-2 w-56 origin-top-left rounded-2xl border border-black/5 bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                className={`absolute left-0 z-50 mt-2 w-56 origin-top-left rounded-2xl border border-black/10 bg-white/90 p-2 shadow-[0_20px_60px_rgba(0,0,0,0.12)] backdrop-blur transition-all duration-200 ${
                   dateMenuOpen
                     ? "scale-100 opacity-100"
                     : "pointer-events-none scale-95 opacity-0 -translate-y-1"
@@ -721,21 +721,25 @@ const EmailSidebar = () => {
       </div>
 
       <div className="pt-6 grid min-h-0 gap-2 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[830px_minmax(0,1fr)] 2xl:grid-cols-[460px_minmax(0,1fr)] lg:h-[calc(100vh-10px)] lg:overflow-hidden">
-        <div className="mt-[-20px] flex min-h-0 flex-col gap-3 pt-[110px] md:pt-[104px] lg:pt-[57px]">
-          <div className="flex flex-1 min-h-0 flex-col rounded-[24px] border border-black/5 bg-white/90 px-4 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)] backdrop-blur">
-            <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-black/5 bg-white/95 px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm">
-              <div className="border border-slate-400/50 p-1 px-2 rounded-2xl flex items-center gap-2">
+        <div className="mt-[-20px] flex min-h-0 flex-col gap-3 pt-[110px] md:pt-[104px] lg:pt-[70px]">
+          <div className="flex flex-1 min-h-0 flex-col rounded-[24px] border border-black/10 bg-white/70 px-4 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur">
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm">
+              <div className="border border-black/10 p-1 px-2 rounded-2xl flex items-center gap-2 bg-white/70">
                 <span
                   className={`h-2 w-2 rounded-full ${
                     syncing
                       ? "bg-[var(--accent)] animate-pulse"
-                      : "bg-emerald-500"
+                      : "bg-black/50"
                   }`}
                 />
                 <span>{syncing ? "Syncing" : "Up to date"}</span>
                 {syncing && (
                   <FaSpinner className="animate-spin text-[color:var(--accent)]" />
                 )}
+              </div>
+              <div className="hidden sm:flex items-center gap-2 text-gray-500">
+                <span className="kbd">⌘</span>
+                <span className="kbd">K</span>
               </div>
               <div className="flex items-center gap-1 text-gray-500">
                 <span>Emails:</span>
@@ -744,12 +748,12 @@ const EmailSidebar = () => {
                 </span>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto pr-1">
+            <div className="flex-1 overflow-y-auto pr-1 scrollbar-subtle">
               {newMailCount > 0 && page !== 1 && (
                 <button
                   type="button"
                   onClick={handleRefresh}
-                  className="mb-3 w-full rounded-lg border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--accent)] transition hover:bg-indigo-100"
+                  className="mb-3 w-full rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-black/5"
                 >
                   {newMailCount} new messages · Refresh
                 </button>
@@ -792,8 +796,8 @@ const EmailSidebar = () => {
                 disabled={!canPrev}
                 className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
                   canPrev
-                    ? "border-black/5 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
-                    : "cursor-not-allowed border-black/5 text-gray-300"
+                    ? "border-black/10 text-gray-800 hover:bg-black/5"
+                    : "cursor-not-allowed border-black/10 text-gray-300"
                 }`}
               >
                 Prev
@@ -805,8 +809,8 @@ const EmailSidebar = () => {
                 disabled={!canNext}
                 className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
                   canNext
-                    ? "border-black/5 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
-                    : "cursor-not-allowed border-black/5 text-gray-300"
+                    ? "border-black/10 text-gray-800 hover:bg-black/5"
+                    : "cursor-not-allowed border-black/10 text-gray-300"
                 }`}
               >
                 Next
@@ -818,14 +822,14 @@ const EmailSidebar = () => {
 
       <div className="flex min-h-0 flex-col gap-3">
         <div className="flex items-center justify-end">
-          <div className="flex flex-wrap items-center gap-1 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-1.5 py-1.5 text-[11px] font-semibold text-gray-600 shadow-[0_8px_18px_rgba(99,102,241,0.12)]">
+          <div className="flex flex-wrap items-center gap-1 rounded-full border border-black/10 bg-white/70 px-1.5 py-1.5 text-[11px] font-semibold text-gray-700 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur">
             <button
               type="button"
               onClick={() => setReadingMode("clean")}
               className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 readingMode === "clean"
                   ? "bg-black py-1 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
+                  : "text-gray-700 hover:bg-black/5"
               }`}
             >
               Clean
@@ -836,7 +840,7 @@ const EmailSidebar = () => {
               className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 readingMode === "raw"
                   ? "bg-black py-1 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-sky-50 hover:text-sky-700"
+                  : "text-gray-700 hover:bg-black/5"
               }`}
             >
               Raw
@@ -852,7 +856,7 @@ const EmailSidebar = () => {
               disabled={!selectedThread}
               className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 selectedThread
-                  ? "text-gray-600 hover:bg-emerald-50 hover:text-emerald-700"
+                  ? "text-gray-700 hover:bg-black/5"
                   : "cursor-not-allowed text-gray-300"
               }`}
             >
@@ -865,8 +869,8 @@ const EmailSidebar = () => {
               className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
                 selectedThread
                   ? showDetails
-                    ? "bg-amber-100 py-1 text-amber-700"
-                    : "text-gray-600 hover:bg-amber-50 hover:text-amber-700"
+                    ? "bg-black py-1 text-white shadow-sm"
+                    : "text-gray-700 hover:bg-black/5"
                   : "cursor-not-allowed text-gray-300"
               }`}
             >
@@ -876,6 +880,11 @@ const EmailSidebar = () => {
         </div>
 
         <ThreadDetail
+          key={
+            selectedThread?.threadId
+              ? `${selectedThread.threadId}:${selectedThread.account || ""}`
+              : "thread:none"
+          }
           thread={selectedThread}
           messages={threadMessages}
           loading={threadLoading}

@@ -310,10 +310,6 @@ const ThreadDetail = ({
   readingMode = "clean",
   showDetails = false,
 }) => {
-  const [showImages, setShowImages] = useState(true);
-  const [expandedQuotes, setExpandedQuotes] = useState({});
-  const [frameHeights, setFrameHeights] = useState({});
-
   const trustedSet = useMemo(() => {
     return new Set(
       (trustedSenders || [])
@@ -322,19 +318,17 @@ const ThreadDetail = ({
     );
   }, [trustedSenders]);
 
-  useEffect(() => {
-    setExpandedQuotes({});
-    setFrameHeights({});
-  }, [thread?.threadId, thread?.account]);
-
-  useEffect(() => {
+  const initialShowImages = useMemo(() => {
     const email = extractEmailAddress(thread?.from || "");
     const domain = email.split("@")[1] || "";
     const trusted =
-      (email && trustedSet.has(email)) ||
-      (domain && trustedSet.has(domain));
-    setShowImages(Boolean(trusted));
-  }, [thread?.threadId, thread?.account, trustedSet]);
+      (email && trustedSet.has(email)) || (domain && trustedSet.has(domain));
+    return Boolean(trusted);
+  }, [thread?.from, trustedSet]);
+
+  const [showImages, setShowImages] = useState(initialShowImages);
+  const [expandedQuotes, setExpandedQuotes] = useState({});
+  const [frameHeights, setFrameHeights] = useState({});
 
   const threadMeta = useMemo(() => {
     const allAttachments = [];
@@ -439,8 +433,8 @@ const ThreadDetail = ({
             : "grid-cols-1"
         }`}
       >
-        <div className="min-h-0 overflow-y-auto rounded-[26px] border border-black/5 bg-purple-50 p-5 shadow-[0_14px_28px_rgba(15,23,42,0.05)]">
-          <div className="-mx-5 -mt-5 mb-4 border-b border-black/5 bg-white/95 px-5 py-4">
+        <div className="min-h-0 overflow-y-auto rounded-[26px] border border-black/10 bg-white/70 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur detail-noise surface-inset scrollbar-subtle">
+          <div className="-mx-5 -mt-5 mb-4 border-b border-black/10 bg-white/80 px-5 py-4 backdrop-blur surface-inset">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -468,7 +462,7 @@ const ThreadDetail = ({
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-semibold text-[color:var(--accent)]">
+                <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-[11px] font-semibold text-[color:var(--ink)]">
                   {thread.account || "Account"}
                 </span>
                 {isTrustedSender ? (
@@ -545,9 +539,9 @@ const ThreadDetail = ({
                   <details
                     key={message.id || `${message.threadId}-${index}`}
                     open={isLatest}
-                    className="rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
+                    className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 shadow-[0_18px_60px_rgba(0,0,0,0.08)] backdrop-blur surface-inset"
                   >
-                    <summary className="cursor-pointer list-none">
+                    <summary className="cursor-pointer list-none interactive">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-gray-900">
@@ -559,7 +553,7 @@ const ThreadDetail = ({
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-gray-500">
                         {message.isUnread ? (
-                          <span className="rounded-full border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-2 py-0.5 font-semibold text-[color:var(--accent)]">
+                          <span className="rounded-full border border-black/10 bg-white/80 px-2 py-0.5 font-semibold text-[color:var(--ink)]">
                             Unread
                           </span>
                         ) : null}

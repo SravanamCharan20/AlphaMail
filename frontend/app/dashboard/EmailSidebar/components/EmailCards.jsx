@@ -7,7 +7,7 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
       ? now
       : now
       ? new Date(now).getTime()
-      : Date.now();
+      : 0;
   const formatDate = (value) => {
     if (!value) return "";
     const parsed = new Date(value);
@@ -44,14 +44,8 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
     return value.split(",")[0].trim();
   };
 
-  const getProviderTag = (account) => {
-    if (!account) return "Account";
-    if (account.includes("gmail.com")) return "Gmail";
-    return account.split("@")[1] ? account.split("@")[1] : account;
-  };
-
   return (
-    <div className="overflow-hidden cursor-pointer rounded-2xl border border-black/5 bg-white/92 shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+    <div className="overflow-hidden cursor-pointer rounded-2xl border border-black/10 bg-white/70 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur detail-noise">
       {msgs.map((mail, index) => {
         const isSelected =
           selectedKey && selectedKey === getThreadKey(mail);
@@ -66,18 +60,18 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                 onSelect?.(mail);
               }
             }}
-            className={`group relative cursor-pointer w-full text-left px-3.5 py-3 transition ${
+            className={`group relative cursor-pointer w-full text-left px-3.5 py-3 interactive ${
               isSelected
-                ? "bg-slate-300/30"
+                ? "bg-black/5"
                 : "hover:bg-black/5"
-            } border-b border-black/5 last:border-b-0`}
+            } border-b border-black/10 last:border-b-0`}
           >
             <div className="flex items-start gap-3">
               <div
                 className={`mt-0.5 h-9 w-9 flex-shrink-0 rounded-full text-xs font-semibold uppercase grid place-items-center ${
                   mail.isUnread
-                    ? "bg-[var(--accent-soft)] text-[color:var(--accent)]"
-                    : "bg-gray-100 text-gray-600"
+                    ? "bg-white/90 text-[color:var(--ink)] border border-black/10"
+                    : "bg-white/60 text-gray-600 border border-black/10"
                 }`}
               >
                 {getInitials(mail.from)}
@@ -103,8 +97,8 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                 </div>
 
                 <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
-                  {mail.newUntil && nowTs < mail.newUntil ? (
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                  {mail.newUntil && nowTs > 0 && nowTs < mail.newUntil ? (
+                    <span className="rounded-full border border-black/10 bg-white/80 px-2 py-0.5 font-semibold text-[color:var(--ink)]">
                       New
                     </span>
                   ) : null}
@@ -119,7 +113,7 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                 </p>
 
                 <div className="mt-2">
-                  <span className="inline-flex items-center rounded-full border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--accent)]">
+                  <span className="inline-flex items-center rounded-full border border-black/10 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-gray-700">
                     To: {getToLabel(mail.to) || mail.account || "Recipient"}
                   </span>
                 </div>

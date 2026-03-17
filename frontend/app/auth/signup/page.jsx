@@ -16,6 +16,7 @@ const Signup = () => {
   const router = useRouter();
 
   const handleSubmit = async (e) => {
+    e?.preventDefault?.();
     setLoading(true);
     try {
       const res = await apiFetch("/auth/signup", {
@@ -49,38 +50,103 @@ const Signup = () => {
     }
   };
   return (
-    <div className="flex flex-col mx-auto text-center w-1/3 m-2 border border-amber-200">
-      <label>username</label>
-      <input
-        type="text"
-        onChange={(e) => setUsername(e.target.value)}
-        value={username}
-        className="border w-1/2 mx-auto p-2 m-2"
-      />
-      <label>email</label>
-      <input
-        type="text"
-        onChange={(e) => setEmail(e.target.value)}
-        value={email}
-        className="border w-1/2 mx-auto p-2 m-2"
-      />
-      <label>password</label>
-      <input
-        type="text"
-        onChange={(e) => setPassword(e.target.value)}
-        value={password}
-        className="border w-1/2 mx-auto p-2 m-2"
-      />
-      <button
-        disabled={loading}
-        onClick={handleSubmit}
-        className="rounded-lg p-2 bg-blue-300 w-1/3 mx-auto m-2 cursor-pointer hover:bg-blue-400"
-      >
-        {loading ? "loading .." : "submit"}
-      </button>
-      <h3>Already had a account? <Link href='/auth/signin'>Signin</Link></h3>
-      {success && <p className="text-green-500">{success}</p>}
-      {error && <p className="text-red-500">{error}</p>}
+    <div className="relative min-h-screen">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-5 sm:px-10 py-12">
+        <div className="w-full max-w-[440px]">
+          <div className="surface-strong rounded-[28px] px-6 py-7 sm:px-7">
+            <div className="mb-6">
+              <Link
+                href="/"
+                className="text-[11px] font-semibold text-[color:var(--muted)] hover:text-[color:var(--ink)]"
+              >
+                ← Back to AlphaMail
+              </Link>
+              <h1 className="mt-4 font-display text-[1.45rem] font-semibold tracking-tight text-[color:var(--ink)]">
+                Create your account
+              </h1>
+              <p className="mt-2 text-sm text-[color:var(--muted)]">
+                Set up your profile, then connect your inbox.
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="space-y-1.5 text-left">
+                <label className="text-[11px] font-semibold text-[color:var(--muted)]">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  autoComplete="name"
+                  onChange={(e) => setUsername(e.target.value)}
+                  value={username}
+                  placeholder="Your name"
+                  className="w-full rounded-2xl border border-black/10 bg-white/90 px-4 py-3 text-sm text-[color:var(--ink)] shadow-sm outline-none transition focus:border-[color:var(--accent)]/40 focus:ring-4 focus:ring-[color:var(--accent)]/10"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-[11px] font-semibold text-[color:var(--muted)]">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  onChange={(e) => setEmail(e.target.value)}
+                  value={email}
+                  placeholder="you@company.com"
+                  className="w-full rounded-2xl border border-black/10 bg-white/90 px-4 py-3 text-sm text-[color:var(--ink)] shadow-sm outline-none transition focus:border-[color:var(--accent)]/40 focus:ring-4 focus:ring-[color:var(--accent)]/10"
+                />
+              </div>
+
+              <div className="space-y-1.5 text-left">
+                <label className="text-[11px] font-semibold text-[color:var(--muted)]">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  value={password}
+                  placeholder="At least 8 characters"
+                  className="w-full rounded-2xl border border-black/10 bg-white/90 px-4 py-3 text-sm text-[color:var(--ink)] shadow-sm outline-none transition focus:border-[color:var(--accent)]/40 focus:ring-4 focus:ring-[color:var(--accent)]/10"
+                />
+              </div>
+
+              {success ? (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {success}
+                </div>
+              ) : null}
+              {error ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {error}
+                </div>
+              ) : null}
+
+              <button
+                disabled={loading}
+                type="submit"
+                className="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(10,132,255,0.20)] interactive disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {loading ? "Creating…" : "Create account"}
+              </button>
+            </form>
+
+            <p className="mt-5 text-center text-xs text-[color:var(--muted)]">
+              Already have an account?{" "}
+              <Link
+                href="/auth/signin"
+                className="font-semibold text-[color:var(--accent)] hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+          <p className="mt-4 text-center text-[11px] text-[color:var(--muted)]">
+            Premium surfaces, subtle depth, confident typography.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

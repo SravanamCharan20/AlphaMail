@@ -33,7 +33,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      const res = await apiFetch("/auth/logout", {
+      await apiFetch("/auth/logout", {
         method: "POST", // important
       });
 
@@ -103,7 +103,15 @@ const Navbar = () => {
 
   useEffect(() => {
     if (loading || !user) return;
-    fetchAccounts().finally(() => notifyAccountsUpdated());
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      fetchAccounts().finally(() => notifyAccountsUpdated());
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [loading, user]);
 
   useEffect(() => {
@@ -133,17 +141,17 @@ const Navbar = () => {
   if (loading && !user) return null;
 
   const quickModeStyles = [
-    "bg-[color:var(--accent)] text-white shadow-sm",
-    "bg-[color:var(--highlight)]/35 text-[color:var(--ink)] hover:bg-[color:var(--highlight)]/45",
-    "bg-white text-[color:var(--muted)] border border-[color:var(--accent-soft)] hover:bg-[color:var(--accent-soft)]",
+    "bg-black text-white shadow-sm",
+    "bg-white text-[color:var(--ink)] border border-black/10 hover:bg-black/5",
+    "bg-white text-[color:var(--muted)] border border-black/10 hover:bg-black/5",
   ];
 
   return (
     <nav className="fixed top-0 left-1/2 -translate-x-1/2 z-50">
       {toast && (
-        <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-[color:var(--highlight)]/40 bg-white p-4 animate-[fadeUp_0.25s_ease-out]">
+        <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-black/10 bg-white p-4 shadow-[0_20px_60px_rgba(0,0,0,0.12)] animate-[fadeUp_0.25s_ease-out]">
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-full bg-[color:var(--highlight)]/20 text-[color:var(--highlight)] grid place-items-center">
+            <div className="h-10 w-10 rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent)] grid place-items-center">
               <FiCheck className="text-[20px]" />
             </div>
             <div>
@@ -166,24 +174,24 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="relative w-[min(94vw,700px)] rounded-b-[32px] border border-[color:var(--accent-soft)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(246,245,242,0.92)_100%)] shadow-[0_18px_45px_rgba(43,44,52,0.12)] ring-1 ring-white/80 backdrop-blur-xl px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out]">
+      <div className="relative w-[min(94vw,700px)] rounded-b-[28px] border border-black/10 bg-white/75 shadow-[0_20px_60px_rgba(0,0,0,0.10)] ring-1 ring-white/70 backdrop-blur-xl px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out] detail-noise">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="h-9 w-9 rounded-full border border-[color:var(--accent-soft)] bg-[color:var(--accent-soft)] text-[color:var(--accent)] grid place-items-center shadow-sm"
+              className="h-9 w-9 rounded-full border border-black/10 bg-white/80 text-black grid place-items-center shadow-sm interactive"
               aria-label="AlphaMail home"
             >
               <FiActivity className="text-[18px]" />
             </button>
-            <div className="hidden lg:flex items-center gap-1 rounded-full bg-white/80 p-1 border border-[color:var(--accent-soft)]">
+            <div className="hidden lg:flex items-center gap-1 rounded-full bg-white/70 p-1 border border-black/10">
               {["N", "D", "F"].map((label, idx) => (
                 <button
                   key={label}
                   type="button"
-                  className={`h-7 w-7 rounded-lg text-xs font-semibold transition ${
+                  className={`h-7 w-7 rounded-lg text-xs font-semibold interactive ${
                     quickModeStyles[idx] ||
-                    "bg-white text-[color:var(--muted)] border border-[color:var(--accent-soft)]"
+                    "bg-white text-[color:var(--muted)] border border-black/10"
                   }`}
                 >
                   {label}
@@ -193,7 +201,7 @@ const Navbar = () => {
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
-            <div className="flex w-[220px] items-center gap-2 rounded-full border border-[color:var(--accent-soft)] bg-white/80 px-3 py-1.5 text-[color:var(--muted)]">
+            <div className="flex w-[240px] items-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-[color:var(--muted)]">
               <FiSearch className="text-[16px] text-[color:var(--muted)]" />
               <span className="text-[11px]">Search mail</span>
             </div>
@@ -202,7 +210,7 @@ const Navbar = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-soft)] bg-white px-3 py-1.5 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm transition hover:bg-[color:var(--accent-soft)]"
+              className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-black/5"
               aria-label="Filters"
             >
               <span className="hidden sm:inline">Filters</span>
@@ -211,7 +219,7 @@ const Navbar = () => {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent)] px-3 py-1.5 text-[11px] font-semibold text-white shadow-[0_10px_24px_rgba(201,124,93,0.3)]"
+              className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm interactive"
             >
               AI
             </button>
@@ -229,7 +237,7 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="h-9 w-9 rounded-full cursor-pointer bg-[color:var(--accent-soft)] text-[color:var(--ink)] grid place-items-center text-xs font-semibold ring-1 ring-[color:var(--accent-soft)] transition hover:bg-[color:var(--highlight)]/30"
+                className="h-9 w-9 rounded-full cursor-pointer bg-white/80 text-[color:var(--ink)] grid place-items-center text-xs font-semibold ring-1 ring-black/10 interactive hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={open}
               >
@@ -346,7 +354,7 @@ const Navbar = () => {
             <button
               type="button"
               onClick={handleConnectMail}
-              className="h-9 w-9 rounded-full bg-[color:var(--accent)] text-white grid place-items-center shadow-[0_12px_26px_rgba(201,124,93,0.35)]"
+              className="h-9 w-9 rounded-full bg-[color:var(--accent)] text-white grid place-items-center shadow-[0_12px_30px_rgba(10,132,255,0.24)] interactive"
               aria-label="Connect account"
             >
               <FiPlus className="text-[18px]" />

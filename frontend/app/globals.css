@@ -1,16 +1,38 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
-  --ink: #000000;
-  --muted: #667085;
+  /* Apple-like neutrals + subtle blue accent */
+  --ink: #0b0b0f;
+  --muted: rgba(60, 60, 67, 0.72); /* iOS secondary label-ish */
   --paper: #ffffff;
-  --canvas: #f7f8fc;
-  --accent: #2f2a63;
-  --accent-soft: #e8e9ff;
-  --border-soft: rgba(32, 38, 55, 0.08);
-  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui;
-  --font-display: "IBM Plex Mono", "IBM Plex Sans", ui-monospace, monospace;
+  --canvas: #f5f5f7; /* Apple-ish background */
+
+  /* Accent */
+  --accent: #0a84ff; /* Apple blue */
+  --accent-soft: rgba(10, 132, 255, 0.14);
+  --highlight: rgba(10, 132, 255, 0.22);
+
+  /* Surfaces + borders */
+  --surface-1: rgba(255, 255, 255, 0.78);
+  --surface-2: rgba(255, 255, 255, 0.62);
+  --border-soft: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+
+  /* Radii */
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 24px;
+  --r-xl: 32px;
+
+  /* Shadows */
+  --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 20px 60px rgba(0, 0, 0, 0.10);
+
+  --font-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --font-display: var(--font-body);
+
   font-family: var(--font-body);
   color-scheme: light;
 }
@@ -19,12 +41,24 @@
   font-family: var(--font-display);
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
 body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
   background: var(--canvas);
   color: var(--ink);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
 }
 
 h1,
@@ -38,6 +72,191 @@ h6 {
 
 ::selection {
   background: rgba(47, 42, 99, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer base {
+  :focus-visible {
+    outline: 3px solid rgba(10, 132, 255, 0.28);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .app-bg {
+    background: linear-gradient(180deg, #fafafa 0%, var(--canvas) 55%);
+  }
+
+  .scrollbar-subtle {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+  }
+
+  .scrollbar-subtle::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  .scrollbar-subtle::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-subtle::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.28);
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-subtle::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .hairline {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .hairline-top {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .hairline-bottom {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .detail-noise {
+    position: relative;
+  }
+
+  .detail-noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background-image:
+      radial-gradient(circle at 0 0, rgba(0, 0, 0, 0.018) 0, transparent 55%),
+      radial-gradient(circle at 100% 0, rgba(0, 0, 0, 0.012) 0, transparent 52%),
+      radial-gradient(circle at 50% 120%, rgba(0, 0, 0, 0.010) 0, transparent 58%);
+    opacity: 0.9;
+    mix-blend-mode: multiply;
+  }
+
+  .surface-inset {
+    position: relative;
+  }
+
+  .surface-inset::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.70),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+  }
+
+  .divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    background: rgba(255, 255, 255, 0.75);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.7),
+      0 10px 24px rgba(0, 0, 0, 0.06);
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(60, 60, 67, 0.9);
+  }
+
+  .interactive {
+    transition:
+      transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      opacity 160ms ease;
+    will-change: transform;
+  }
+
+  .interactive:hover {
+    transform: translateY(-1px);
+  }
+
+  .interactive:active {
+    transform: translateY(0px) scale(0.99);
+  }
+
+  .soft-shadow {
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.10);
+  }
+
+  .surface {
+    border: 1px solid var(--border-soft);
+    background: var(--surface-1);
+    box-shadow: var(--shadow-sm);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+
+  .surface-strong {
+    border: 1px solid var(--border-soft);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: var(--shadow-md);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  .text-balance {
+    /* Progressive enhancement; older browsers will ignore. */
+    text-wrap: balance;
+  }
 }
 
 @keyframes fadeUp {

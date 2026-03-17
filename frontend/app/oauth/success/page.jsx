@@ -23,9 +23,9 @@ const OAuthSuccess = () => {
   }, [provider, email]);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#fff7ef_0%,_#f6f2ee_45%,_#efe7df_100%)] flex items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,0.12)] border border-neutral-200 p-6 text-center animate-[fadeUp_0.35s_ease-out]">
-        <div className="mx-auto h-12 w-12 rounded-full bg-green-100 text-green-700 grid place-items-center">
+    <div className="min-h-screen bg-[var(--canvas)] flex items-center justify-center p-6">
+      <div className="w-full max-w-sm rounded-3xl bg-white/80 shadow-[0_20px_60px_rgba(0,0,0,0.12)] border border-black/10 p-6 text-center backdrop-blur animate-[fadeUp_0.35s_ease-out]">
+        <div className="mx-auto h-12 w-12 rounded-full bg-black text-white grid place-items-center">
           <FiCheck className="text-[24px]" />
         </div>
         <h1 className="mt-4 text-base font-semibold text-neutral-900">
