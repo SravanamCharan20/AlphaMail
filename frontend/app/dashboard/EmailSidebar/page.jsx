@@ -11,6 +11,7 @@ import {
   dedupeEmails,
   mergeEmails,
   sortEmails,
+  getEmailSignature,
   getThreadKey,
 } from "./emailUtils";
 import { matchesFilters } from "./filterUtils";
@@ -36,6 +37,7 @@ const EmailSidebar = () => {
   const [trustedSenders, setTrustedSenders] = useState([]);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const [newTagNow, setNewTagNow] = useState(Date.now());
 
   const filtersRef = useRef({ account: "all", range: "all" });
   const lastFiltersRef = useRef({ account: "all", range: "all" });
@@ -43,9 +45,11 @@ const EmailSidebar = () => {
   const fetchSeqRef = useRef(0);
   const fetchAbortRef = useRef(null);
   const selectedThreadRef = useRef(null);
+  const newTagMapRef = useRef(new Map());
 
   const tzOffset = useMemo(() => -new Date().getTimezoneOffset(), []);
   const pageSize = 5;
+  const NEW_TAG_TTL_MS = 2 * 60 * 1000;
 
   const updateRefs = () => {
     filtersRef.current = { account: accountFilter, range: dateRange };
@@ -62,6 +66,24 @@ const EmailSidebar = () => {
     setReadingMode("clean");
     setShowDetails(false);
   }, [selectedThread?.threadId, selectedThread?.account]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      let changed = false;
+      for (const [key, until] of newTagMapRef.current.entries()) {
+        if (until <= now) {
+          newTagMapRef.current.delete(key);
+          changed = true;
+        }
+      }
+      if (changed) {
+        setNewTagNow(now);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const buildMessagesPath = (account, range, pageNumber, pageLimit) => {
     const params = new URLSearchParams();
@@ -238,10 +260,11 @@ const EmailSidebar = () => {
       if (fetchSeqRef.current !== seq) return;
       const emails = Array.isArray(data.emails) ? data.emails : [];
       const uniqueEmails = dedupeEmails(emails).map((email) => {
+        const newUntil = getNewUntil(email);
         if (email.syncSource === "incremental") {
-          return { ...email, syncSource: "incremental" };
+          return { ...email, syncSource: "incremental", newUntil };
         }
-        return email;
+        return newUntil ? { ...email, newUntil } : email;
       });
 
       setMessages(uniqueEmails);
@@ -392,6 +415,12 @@ const EmailSidebar = () => {
         return;
       }
 
+      const isIncremental =
+        email?.isIncremental || email?.syncSource === "incremental";
+      if (isIncremental) {
+        markNewTag(email);
+      }
+
       if (pageRef.current !== 1) {
         setNewMailCount((prev) => prev + 1);
         setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
@@ -399,18 +428,21 @@ const EmailSidebar = () => {
       }
 
       setMessages((prev) => {
-        const merged = mergeEmails(prev, email);
+        const newUntil = isIncremental ? getNewUntil(email) : null;
+        const enrichedEmail = newUntil ? { ...email, newUntil } : email;
+        const merged = mergeEmails(prev, enrichedEmail);
         const sorted = sortEmails(merged);
         const next = sorted.slice(0, pageSize);
-        if (email?.isIncremental) {
-          return next.map((item) =>
-            item.threadId === email.threadId &&
-            item.account === email.account
-              ? { ...item, syncSource: "incremental" }
-              : item
-          );
-        }
-        return next;
+        if (!isIncremental) return next;
+        return next.map((item) =>
+          item.threadId === email.threadId && item.account === email.account
+            ? {
+                ...item,
+                syncSource: "incremental",
+                newUntil,
+              }
+            : item
+        );
       });
 
       setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
@@ -450,6 +482,34 @@ const EmailSidebar = () => {
       socket.off("email-updated");
     };
   }, []);
+
+  const getNewKey = (email) => {
+    if (!email) return "";
+    const threadKey = getThreadKey(email);
+    if (threadKey && threadKey !== "::") return threadKey;
+    return getEmailSignature(email);
+  };
+
+  const markNewTag = (email) => {
+    const key = getNewKey(email);
+    if (!key) return null;
+    const until = Date.now() + NEW_TAG_TTL_MS;
+    newTagMapRef.current.set(key, until);
+    setNewTagNow(Date.now());
+    return until;
+  };
+
+  const getNewUntil = (email) => {
+    const key = getNewKey(email);
+    if (!key) return null;
+    const until = newTagMapRef.current.get(key);
+    if (!until) return null;
+    if (until <= Date.now()) {
+      newTagMapRef.current.delete(key);
+      return null;
+    }
+    return until;
+  };
 
   const canPrev = page > 1;
   const fallbackNext =
@@ -714,6 +774,7 @@ const EmailSidebar = () => {
                   msgs={messages}
                   selectedKey={selectedKey}
                   onSelect={handleSelectThread}
+                  now={newTagNow}
                 />
               )}
             </div>

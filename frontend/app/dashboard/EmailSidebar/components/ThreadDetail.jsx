@@ -27,6 +27,66 @@ const normalizeHtml = (value) =>
     .replace(/&zwnj;|&#8204;|&#8205;/gi, "")
     .replace(/&nbsp;/gi, " ");
 
+const decodeHtmlEntities = (value) => {
+  if (!value) return "";
+  if (typeof document === "undefined") return value;
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = value;
+  return textarea.value;
+};
+
+const stripHtmlTags = (value) =>
+  String(value || "").replace(/<\/?[^>]+(>|$)/g, "");
+
+const simplifyUrl = (rawUrl) => {
+  if (!rawUrl) return "";
+  const normalized = rawUrl.startsWith("www.")
+    ? `https://${rawUrl}`
+    : rawUrl;
+  try {
+    const parsed = new URL(normalized);
+    const hostname = parsed.hostname.replace(/^www\./, "");
+    const path = parsed.pathname.replace(/\/+/g, "/");
+    if (!path || path === "/") return hostname;
+    const trimmedPath = path.length > 20 ? `${path.slice(0, 20)}…` : path;
+    return `${hostname}${trimmedPath}`;
+  } catch (error) {
+    return rawUrl.length > 40 ? `${rawUrl.slice(0, 37)}…` : rawUrl;
+  }
+};
+
+const formatCleanText = (value) => {
+  if (!value) return "";
+  const decoded = decodeHtmlEntities(value);
+  const stripped = normalizeText(stripHtmlTags(decoded));
+  const bracketedLinks = stripped.replace(
+    /\[(https?:\/\/[^\]\s]+)\]/gi,
+    (_, url) => `link:${simplifyUrl(url)}`
+  );
+  const withLinks = bracketedLinks.replace(
+    /https?:\/\/[^\s)>"']+|www\.[^\s)>"']+/gi,
+    (match) => `link:${simplifyUrl(match)}`
+  );
+
+  const lines = withLinks
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const onlyLinks = line
+        .replace(/link:[^\s]+/gi, "")
+        .replace(/[.,;:|]/g, "")
+        .trim().length === 0;
+      if (onlyLinks && line.length > 40) {
+        return "";
+      }
+      return line.length > 180 ? `${line.slice(0, 180)}…` : line;
+    })
+    .filter(Boolean);
+
+  return lines.join("\n\n");
+};
+
 const extractLinks = (text) => {
   if (!text) return [];
   const matches = text.match(
@@ -154,6 +214,87 @@ const extractHtmlSegments = (html) => {
     };
   } catch (error) {
     return { mainHtml: html, quotedHtml: "" };
+  }
+};
+
+const cleanHtmlForReading = (html) => {
+  if (!html) return "";
+  if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+    return html;
+  }
+
+  const decoded = decodeHtmlEntities(html);
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(decoded, "text/html");
+
+    const removeSelectors = [
+      "script",
+      "style",
+      "iframe",
+      "form",
+      "input",
+      "button",
+      "select",
+      "option",
+      "textarea",
+      "svg",
+      "canvas",
+      "video",
+      "audio",
+      "picture",
+      "source",
+      "img",
+      "figure",
+      "noscript",
+    ];
+
+    removeSelectors.forEach((selector) => {
+      doc.querySelectorAll(selector).forEach((el) => el.remove());
+    });
+
+    doc.querySelectorAll("[style]").forEach((el) => {
+      const style = el.getAttribute("style") || "";
+      if (
+        /display\s*:\s*none/i.test(style) ||
+        /visibility\s*:\s*hidden/i.test(style) ||
+        /opacity\s*:\s*0/i.test(style) ||
+        /font-size\s*:\s*0/i.test(style)
+      ) {
+        el.remove();
+      }
+    });
+
+    doc.querySelectorAll("*").forEach((el) => {
+      const attrs = Array.from(el.attributes || []);
+      attrs.forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        if (name === "href") {
+          const href = el.getAttribute("href") || "";
+          if (
+            !href.startsWith("http://") &&
+            !href.startsWith("https://") &&
+            !href.startsWith("mailto:") &&
+            !href.startsWith("tel:")
+          ) {
+            el.removeAttribute("href");
+          }
+          return;
+        }
+        el.removeAttribute(attr.name);
+      });
+    });
+
+    doc.querySelectorAll("*").forEach((el) => {
+      if (["BR", "HR"].includes(el.tagName)) return;
+      if (!el.textContent?.trim() && el.children.length === 0) {
+        el.remove();
+      }
+    });
+
+    return doc.body.innerHTML.trim();
+  } catch (error) {
+    return decoded;
   }
 };
 
@@ -290,47 +431,7 @@ const ThreadDetail = ({
     : false;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="relative rounded-[24px] border border-black/5 bg-white/92 px-4 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.05)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  thread.isUnread
-                    ? "bg-[var(--accent)]"
-                    : "bg-slate-300"
-                }`}
-              />
-              <h2 className="font-display text-[1.05rem] font-semibold tracking-tight text-gray-900 truncate">
-                {title}
-              </h2>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-              <span className="truncate">{subtitle}</span>
-              <span className="text-gray-300">•</span>
-              <span>
-                {formatDateTime(
-                  latestMessage?.receivedAt || latestMessage?.date
-                ) || "—"}
-              </span>
-              <span className="text-gray-300">•</span>
-              <span>{messages?.length || 0} messages</span>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-semibold text-[color:var(--accent)]">
-              {thread.account || "Account"}
-            </span>
-            {isTrustedSender ? (
-              <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                Images trusted
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
+    <div className="flex h-full min-h-0 flex-col">
       <div
         className={`grid min-h-0 flex-1 gap-4 ${
           showDetails
@@ -339,6 +440,46 @@ const ThreadDetail = ({
         }`}
       >
         <div className="min-h-0 overflow-y-auto rounded-[26px] border border-black/5 bg-white p-5 shadow-[0_14px_28px_rgba(15,23,42,0.05)]">
+          <div className="-mx-5 -mt-5 mb-4 border-b border-black/5 bg-white/95 px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      thread.isUnread
+                        ? "bg-[var(--accent)]"
+                        : "bg-slate-300"
+                    }`}
+                  />
+                  <h2 className="font-display text-[1.05rem] font-semibold tracking-tight text-gray-900 truncate">
+                    {title}
+                  </h2>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                  <span className="truncate">{subtitle}</span>
+                  <span className="text-gray-300">•</span>
+                  <span>
+                    {formatDateTime(
+                      latestMessage?.receivedAt || latestMessage?.date
+                    ) || "—"}
+                  </span>
+                  <span className="text-gray-300">•</span>
+                  <span>{messages?.length || 0} messages</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-semibold text-[color:var(--accent)]">
+                  {thread.account || "Account"}
+                </span>
+                {isTrustedSender ? (
+                  <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    Images trusted
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
           {loading ? (
             <div className="text-sm text-gray-500">Loading conversation...</div>
           ) : error ? (
@@ -359,14 +500,28 @@ const ThreadDetail = ({
                 const htmlToUse = normalizeHtml(
                   message.bodyHtmlNoImages || message.bodyHtml || ""
                 );
-                const textBody = normalizeText(
+                const cleanHtml = cleanHtmlForReading(htmlToUse);
+                const textBody = formatCleanText(
                   message.bodyText || message.snippet || ""
                 );
                 const { mainHtml, quotedHtml } =
                   readingMode === "clean"
-                    ? extractHtmlSegments(htmlToUse)
-                    : { mainHtml: htmlToUse, quotedHtml: "" };
+                    ? extractHtmlSegments(cleanHtml)
+                    : { mainHtml: decodeHtmlEntities(htmlToUse), quotedHtml: "" };
                 const { main, quoted } = splitQuotedText(textBody);
+                const hasStructuredHtml =
+                  readingMode === "clean" &&
+                  /<(table|thead|tbody|tr|td|th|ul|ol|li)\b/i.test(
+                    mainHtml || ""
+                  );
+                const useText =
+                  readingMode === "clean" && Boolean(main) && !hasStructuredHtml;
+                const cleanParagraphs = useText
+                  ? main
+                      .split(/\n{2,}/)
+                      .map((paragraph) => paragraph.trim())
+                      .filter(Boolean)
+                  : [];
                 const hasQuoted = Boolean(quotedHtml || quoted);
                 const attachments = Array.isArray(message.attachments)
                   ? message.attachments
@@ -478,6 +633,14 @@ const ThreadDetail = ({
                           {main || "No message content available."}
                         </div>
                       )
+                    ) : useText ? (
+                      <div className="mt-3 space-y-3 text-sm leading-relaxed text-gray-700">
+                        {cleanParagraphs.map((paragraph, idx) => (
+                          <p key={`${frameKey}-p-${idx}`} className="whitespace-pre-wrap">
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
                     ) : mainHtml ? (
                       <div
                         className={`${contentClass} mt-3 overflow-x-auto`}

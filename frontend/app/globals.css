@@ -3,12 +3,12 @@
 
 :root {
   --ink: #121417;
-  --muted: #5f6b7a;
+  --muted: #667085;
   --paper: #ffffff;
-  --canvas: #f4f2ef;
-  --accent: #1f2a44;
-  --accent-soft: #e6ecf7;
-  --border-soft: rgba(18, 20, 23, 0.08);
+  --canvas: #f7f8fc;
+  --accent: #2f2a63;
+  --accent-soft: #e8e9ff;
+  --border-soft: rgba(32, 38, 55, 0.08);
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui;
   --font-display: "IBM Plex Mono", "IBM Plex Sans", ui-monospace, monospace;
   font-family: var(--font-body);
@@ -37,7 +37,7 @@ h6 {
 }
 
 ::selection {
-  background: rgba(31, 42, 68, 0.18);
+  background: rgba(47, 42, 99, 0.18);
 }
 
 @keyframes fadeUp {
@@ -78,6 +78,18 @@ h6 {
   color: #1f2937;
 }
 
+.email-content--clean * {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+}
+
+.email-content--clean p {
+  margin: 0 0 0.85rem;
+}
+
 .email-content--original {
   font-size: 1rem;
   line-height: 1.6;
@@ -96,11 +108,47 @@ h6 {
   margin: 0.75rem 0;
 }
 
+.email-content--clean table {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  margin: 0.75rem 0;
+}
+
+.email-content--clean table table {
+  border: 0;
+  margin: 0;
+}
+
 .email-content td,
 .email-content th {
   border: 1px solid #e5e7eb;
   padding: 0.5rem;
   vertical-align: top;
+}
+
+.email-content--clean td,
+.email-content--clean th {
+  border: 0;
+  padding: 0.45rem 0.6rem;
+}
+
+.email-content--clean tr + tr td,
+.email-content--clean tr + tr th {
+  border-top: 1px solid #edf2f7 !important;
+}
+
+.email-content--clean table table td,
+.email-content--clean table table th {
+  border: 0 !important;
+  padding: 0.2rem 0.3rem;
+}
+
+.email-content--clean hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 0.85rem 0;
 }
 
 .email-content blockquote {

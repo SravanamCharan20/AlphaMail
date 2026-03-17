@@ -135,7 +135,7 @@ const Navbar = () => {
   return (
     <nav className="fixed top-0 left-1/2 -translate-x-1/2 z-50">
       {toast && (
-        <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-emerald-200 bg-white p-4 animate-[fadeUp_0.25s_ease-out]">
+        <div className="fixed right-6 top-6 z-50 w-[280px] rounded-2xl border border-emerald-20 p-4 animate-[fadeUp_0.25s_ease-out]">
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-full bg-emerald-100 text-emerald-700 grid place-items-center">
               <FiCheck className="text-[20px]" />

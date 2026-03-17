@@ -1,7 +1,13 @@
 import React from "react";
 import { getThreadKey } from "../emailUtils";
 
-const EmailCards = ({ msgs, selectedKey, onSelect }) => {
+const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
+  const nowTs =
+    typeof now === "number"
+      ? now
+      : now
+      ? new Date(now).getTime()
+      : Date.now();
   const formatDate = (value) => {
     if (!value) return "";
     const parsed = new Date(value);
@@ -109,8 +115,7 @@ const EmailCards = ({ msgs, selectedKey, onSelect }) => {
                   <span className="rounded-full border border-black/5 bg-white px-2 py-0.5 font-semibold text-gray-600">
                     {getProviderTag(mail.account)}
                   </span>
-                  {mail.syncSource === "incremental" ||
-                  mail.isIncremental ? (
+                  {mail.newUntil && nowTs < mail.newUntil ? (
                     <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
                       New
                     </span>
