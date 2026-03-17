@@ -1,8 +1,7 @@
 import React from "react";
 import { getThreadKey } from "../emailUtils";
 
-const EmailCards = ({ msgs, selectedKey, onSelect, density = "comfortable" }) => {
-  const compact = density === "compact";
+const EmailCards = ({ msgs, selectedKey, onSelect }) => {
   const formatDate = (value) => {
     if (!value) return "";
     const parsed = new Date(value);
@@ -20,14 +19,29 @@ const EmailCards = ({ msgs, selectedKey, onSelect, density = "comfortable" }) =>
     }).format(parsed);
   };
 
-  const getFromLabel = (from) => {
-    if (!from) return "Unknown sender";
-    return from;
+  const getFromName = (value) => {
+    if (!value) return "Unknown sender";
+    const match = value.match(/^(.*?)(<|$)/);
+    const name = match?.[1]?.trim();
+    return name || value;
   };
 
-  const getAccountLabel = (account) => {
-    if (!account) return "Unknown account";
-    return account;
+  const getInitials = (value) => {
+    const name = getFromName(value);
+    const parts = name.split(" ").filter(Boolean).slice(0, 2);
+    const initials = parts.map((part) => part[0]).join("");
+    return initials ? initials.toUpperCase() : "U";
+  };
+
+  const getToLabel = (value) => {
+    if (!value) return "";
+    return value.split(",")[0].trim();
+  };
+
+  const getProviderTag = (account) => {
+    if (!account) return "Account";
+    if (account.includes("gmail.com")) return "Gmail";
+    return account.split("@")[1] ? account.split("@")[1] : account;
   };
 
   return (
@@ -46,9 +60,7 @@ const EmailCards = ({ msgs, selectedKey, onSelect, density = "comfortable" }) =>
                 onSelect?.(mail);
               }
             }}
-            className={`group relative w-full text-left ${
-              compact ? "px-3 py-2.5" : "px-3.5 py-3"
-            } transition ${
+            className={`group relative w-full text-left px-3.5 py-3 transition ${
               isSelected
                 ? "bg-[var(--accent-soft)]/60"
                 : "hover:bg-black/5"
@@ -58,18 +70,21 @@ const EmailCards = ({ msgs, selectedKey, onSelect, density = "comfortable" }) =>
                 : ""
             } border-b border-black/5 last:border-b-0`}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-start gap-2">
-                  <span
-                    className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${
-                      mail.isUnread ? "bg-[var(--accent)]" : "bg-gray-200"
-                    }`}
-                  />
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-0.5 h-9 w-9 flex-shrink-0 rounded-full text-xs font-semibold uppercase grid place-items-center ${
+                  mail.isUnread
+                    ? "bg-[var(--accent-soft)] text-[color:var(--accent)]"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {getInitials(mail.from)}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
                   <p
-                    className={`${
-                      compact ? "text-[13px]" : "text-[14px]"
-                    } line-clamp-2 ${
+                    className={`text-[14px] line-clamp-2 ${
                       mail.isUnread
                         ? "font-semibold text-gray-900"
                         : "font-medium text-gray-700"
@@ -77,49 +92,45 @@ const EmailCards = ({ msgs, selectedKey, onSelect, density = "comfortable" }) =>
                   >
                     {mail.subject || "No subject"}
                   </p>
-                </div>
-                <div
-                  className={`mt-2 flex items-center gap-2 ${
-                    compact ? "text-[11px]" : "text-xs"
-                  }`}
-                >
-                  <p className="text-gray-600 truncate">
-                    {getFromLabel(mail.from)}
-                  </p>
-                  <span className="max-w-[140px] truncate rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--accent)]">
-                    {getAccountLabel(mail.account)}
+                  <span className="whitespace-nowrap text-[11px] text-gray-500">
+                    {formatDate(mail.receivedAt || mail.date) || "—"}
                   </span>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-1 text-[11px] text-gray-500">
-                <span className="whitespace-nowrap">
-                  {formatDate(mail.receivedAt || mail.date) || "—"}
-                </span>
-                <div className="flex items-center gap-1">
+
+                <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+                  <span className="rounded-full border border-black/5 bg-white px-2 py-0.5 font-semibold text-gray-600">
+                    From: {getFromName(mail.from)}
+                  </span>
+                  {getToLabel(mail.to) ? (
+                    <span className="rounded-full border border-black/5 bg-white px-2 py-0.5 font-semibold text-gray-600">
+                      To: {getToLabel(mail.to)}
+                    </span>
+                  ) : null}
+                  <span className="rounded-full border border-black/5 bg-white px-2 py-0.5 font-semibold text-gray-600">
+                    {getProviderTag(mail.account)}
+                  </span>
                   {mail.syncSource === "incremental" ||
                   mail.isIncremental ? (
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
                       New
                     </span>
                   ) : null}
                   {mail.isUnread ? (
-                    <span className="rounded-full border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--accent)]">
+                    <span className="rounded-full border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-2 py-0.5 font-semibold text-[color:var(--accent)]">
                       Unread
                     </span>
                   ) : null}
                 </div>
+
+                <p
+                  className={`mt-2 leading-relaxed text-xs line-clamp-2 ${
+                    mail.isUnread ? "text-gray-700" : "text-gray-500"
+                  }`}
+                >
+                  {mail.snippet || "No preview available."}
+                </p>
               </div>
             </div>
-
-            <p
-              className={`mt-2 leading-relaxed ${
-                compact ? "text-[11px] line-clamp-1" : "text-xs line-clamp-2"
-              } ${
-                mail.isUnread ? "text-gray-700" : "text-gray-500"
-              }`}
-            >
-              {mail.snippet || "No preview available."}
-            </p>
           </button>
         );
       })}

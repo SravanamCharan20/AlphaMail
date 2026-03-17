@@ -14,8 +14,6 @@ import {
 } from "./emailUtils";
 import { matchesFilters } from "./filterUtils";
 
-const DEFAULT_DENSITY = "comfortable";
-
 const EmailSidebar = () => {
   const [messages, setMessages] = useState([]);
   const [accounts, setAccounts] = useState([]);
@@ -32,9 +30,9 @@ const EmailSidebar = () => {
   const [threadMessages, setThreadMessages] = useState([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [threadError, setThreadError] = useState(null);
-  const [density, setDensity] = useState(DEFAULT_DENSITY);
+  const [readingMode, setReadingMode] = useState("clean");
+  const [showDetails, setShowDetails] = useState(false);
   const [trustedSenders, setTrustedSenders] = useState([]);
-  const [prefsLoading, setPrefsLoading] = useState(false);
 
   const filtersRef = useRef({ account: "all", range: "all" });
   const lastFiltersRef = useRef({ account: "all", range: "all" });
@@ -44,10 +42,7 @@ const EmailSidebar = () => {
   const selectedThreadRef = useRef(null);
 
   const tzOffset = useMemo(() => -new Date().getTimezoneOffset(), []);
-  const pageSize = useMemo(
-    () => (density === "compact" ? 7 : 5),
-    [density]
-  );
+  const pageSize = 5;
 
   const updateRefs = () => {
     filtersRef.current = { account: accountFilter, range: dateRange };
@@ -59,6 +54,11 @@ const EmailSidebar = () => {
   useEffect(() => {
     selectedThreadRef.current = selectedThread;
   }, [selectedThread]);
+
+  useEffect(() => {
+    setReadingMode("clean");
+    setShowDetails(false);
+  }, [selectedThread?.threadId, selectedThread?.account]);
 
   const buildMessagesPath = (account, range, pageNumber, pageLimit) => {
     const params = new URLSearchParams();
@@ -78,19 +78,12 @@ const EmailSidebar = () => {
   };
 
   const fetchPreferences = async () => {
-    setPrefsLoading(true);
     try {
       const res = await apiFetch("/auth/preferences");
       if (!res.ok) {
-        setPrefsLoading(false);
         return;
       }
       const data = await res.json();
-      setDensity(
-        data?.densityPreference === "compact"
-          ? "compact"
-          : "comfortable"
-      );
       setTrustedSenders(
         Array.isArray(data?.imageTrustedSenders)
           ? data.imageTrustedSenders
@@ -98,8 +91,6 @@ const EmailSidebar = () => {
       );
     } catch (error) {
       console.warn("Failed to load preferences", error);
-    } finally {
-      setPrefsLoading(false);
     }
   };
 
@@ -115,11 +106,6 @@ const EmailSidebar = () => {
         return null;
       }
       const data = await res.json();
-      setDensity(
-        data?.densityPreference === "compact"
-          ? "compact"
-          : "comfortable"
-      );
       setTrustedSenders(
         Array.isArray(data?.imageTrustedSenders)
           ? data.imageTrustedSenders
@@ -373,13 +359,6 @@ const EmailSidebar = () => {
     setSelectedThread(nextThread);
   };
 
-  const handleDensityChange = async (next) => {
-    if (!next || next === density) return;
-    setPage(1);
-    setDensity(next);
-    await updatePreferences({ densityPreference: next });
-  };
-
   const handleTrustSender = async (sender) => {
     if (!sender) return;
     await updatePreferences({ addTrustedSender: sender });
@@ -481,191 +460,234 @@ const EmailSidebar = () => {
   const selectedKey = selectedThread ? getThreadKey(selectedThread) : "";
 
   return (
-    <div className="mt-8 grid min-h-0 gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)] lg:h-[calc(100vh-150px)] lg:overflow-hidden">
-      <div className="flex min-h-0 flex-col rounded-[24px] border border-black/5 bg-white/90 p-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)] backdrop-blur">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="font-display text-base font-semibold">Inbox</h1>
-          <div className="relative">
-            <select
-              value={accountFilter}
-              onChange={(event) => {
-                setPage(1);
-                setAccountFilter(event.target.value);
-              }}
-              className="appearance-none rounded-full border border-black/5 bg-white/90 px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-soft)]"
-            >
-              <option value="all">All inbox</option>
-              {accounts.map((account) => (
-                <option
-                  key={account._id || `${account.provider}-${account.email}`}
-                  value={account.email}
+    <div className="mt-1 grid min-h-0 gap-5 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)] 2xl:grid-cols-[360px_minmax(0,1fr)] lg:h-[calc(100vh-150px)] lg:overflow-hidden">
+      <div className="flex min-h-0 flex-col gap-3">
+        <div className="rounded-[22px] border border-black/5 bg-white/90 px-4 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.05)] backdrop-blur">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h1 className="font-display text-base font-semibold">Inbox</h1>
+              <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm">
+                <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                  Account
+                </span>
+                <div className="relative">
+                  <select
+                    value={accountFilter}
+                    onChange={(event) => {
+                      setPage(1);
+                      setAccountFilter(event.target.value);
+                    }}
+                    className="max-w-[170px] appearance-none bg-transparent pr-5 text-[11px] font-semibold text-gray-700 focus:outline-none truncate"
+                  >
+                    <option value="all">All inbox</option>
+                    {accounts.map((account) => (
+                      <option
+                        key={
+                          account._id || `${account.provider}-${account.email}`
+                        }
+                        value={account.email}
+                      >
+                        {account.email}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
+                    ▾
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] text-gray-500">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  syncing
+                    ? "bg-[var(--accent)] animate-pulse"
+                    : "bg-emerald-500"
+                }`}
+              />
+              <span>{syncing ? "Syncing" : "Up to date"}</span>
+              {syncing && (
+                <FaSpinner className="animate-spin text-[color:var(--accent)]" />
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+            <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-2 py-1 text-[11px] font-semibold text-gray-600 shadow-sm">
+              <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                Date
+              </span>
+              <div className="relative">
+                <select
+                  value={dateRange}
+                  onChange={(event) => {
+                    setPage(1);
+                    setDateRange(event.target.value);
+                  }}
+                  className="appearance-none bg-transparent pr-5 text-[11px] font-semibold text-gray-700 focus:outline-none"
                 >
-                  {account.email}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-              ▾
-            </span>
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="week">Last 7 days</option>
+                  <option value="month">Last 30 days</option>
+                </select>
+                <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
+                  ▾
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-black/5 bg-white/90 px-3 py-1 text-[11px] font-semibold text-gray-600 shadow-sm">
+              <span>Emails: {total || messages.length}</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-[11px] text-gray-500">
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              syncing ? "bg-[var(--accent)] animate-pulse" : "bg-emerald-500"
-            }`}
-          />
-          <span>{syncing ? "Syncing" : "Up to date"}</span>
-          {syncing && (
-            <FaSpinner className="animate-spin text-[color:var(--accent)]" />
-          )}
+        <div className="flex flex-1 min-h-0 flex-col rounded-[24px] border border-black/5 bg-white/90 px-4 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)] backdrop-blur">
+          <div className="flex-1 overflow-y-auto pr-1">
+            {newMailCount > 0 && page !== 1 && (
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="mb-3 w-full rounded-lg border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--accent)]"
+              >
+                {newMailCount} new messages · Refresh
+              </button>
+            )}
+
+            {error && (
+              <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                {error}
+              </div>
+            )}
+
+            {loading ? (
+              <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
+                Loading messages...
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
+                No emails found for this filter.
+              </div>
+            ) : (
+              <EmailCards
+                msgs={messages}
+                selectedKey={selectedKey}
+                onSelect={handleSelectThread}
+              />
+            )}
+          </div>
+
+          <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+            <span>
+              {total
+                ? `Showing ${startIndex}-${endIndex} of ${total}`
+                : `Showing ${startIndex}-${endIndex}`}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={!canPrev}
+                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  canPrev
+                    ? "border-black/5 text-gray-700 hover:bg-gray-50"
+                    : "cursor-not-allowed border-black/5 text-gray-300"
+                }`}
+              >
+                Prev
+              </button>
+              <span className="text-[11px] text-gray-400">Page {page}</span>
+              <button
+                type="button"
+                onClick={() => setPage((prev) => prev + 1)}
+                disabled={!canNext}
+                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  canNext
+                    ? "border-black/5 text-gray-700 hover:bg-gray-50"
+                    : "cursor-not-allowed border-black/5 text-gray-300"
+                }`}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500">Date</span>
-          <div className="relative">
-            <select
-              value={dateRange}
-              onChange={(event) => {
-                setPage(1);
-                setDateRange(event.target.value);
-              }}
-              className="appearance-none rounded-full border border-black/5 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-soft)]"
-            >
-              <option value="all">All time</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="week">Last 7 days</option>
-              <option value="month">Last 30 days</option>
-            </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-              ▾
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>Emails: {total || messages.length}</span>
-          <div className="flex items-center rounded-full border border-black/5 bg-white p-1 text-[11px] font-semibold text-gray-600">
+      <div className="flex min-h-0 flex-col gap-3">
+        <div className="flex items-center justify-end">
+          <div className="flex flex-wrap items-center gap-1 rounded-full border border-black/5 bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold text-gray-600 shadow-sm">
             <button
               type="button"
-              onClick={() => handleDensityChange("compact")}
-              disabled={prefsLoading}
+              onClick={() => setReadingMode("clean")}
               className={`rounded-full px-2 py-0.5 transition ${
-                density === "compact"
+                readingMode === "clean"
                   ? "bg-[var(--accent)] text-white"
-                  : prefsLoading
-                  ? "text-gray-300"
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              Compact
+              Clean
             </button>
             <button
               type="button"
-              onClick={() => handleDensityChange("comfortable")}
-              disabled={prefsLoading}
+              onClick={() => setReadingMode("raw")}
               className={`rounded-full px-2 py-0.5 transition ${
-                density === "comfortable"
+                readingMode === "raw"
                   ? "bg-[var(--accent)] text-white"
-                  : prefsLoading
-                  ? "text-gray-300"
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              Comfortable
+              Raw
+            </button>
+            <span className="mx-1 h-4 w-px bg-black/10" />
+            <button
+              type="button"
+              onClick={() =>
+                selectedThread?.isUnread
+                  ? updateReadState(selectedThread, false)
+                  : updateReadState(selectedThread, true)
+              }
+              disabled={!selectedThread}
+              className={`rounded-full px-2 py-0.5 transition ${
+                selectedThread
+                  ? "text-gray-600 hover:bg-gray-100"
+                  : "cursor-not-allowed text-gray-300"
+              }`}
+            >
+              {selectedThread?.isUnread ? "Read" : "Unread"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDetails((prev) => !prev)}
+              disabled={!selectedThread}
+              className={`rounded-full px-2 py-0.5 transition ${
+                selectedThread
+                  ? showDetails
+                    ? "bg-[var(--accent-soft)] text-[color:var(--accent)]"
+                    : "text-gray-600 hover:bg-gray-100"
+                  : "cursor-not-allowed text-gray-300"
+              }`}
+            >
+              Details
             </button>
           </div>
         </div>
+
+        <ThreadDetail
+          thread={selectedThread}
+          messages={threadMessages}
+          loading={threadLoading}
+          error={threadError}
+          onRetry={() => fetchThreadDetails(selectedThread)}
+          trustedSenders={trustedSenders}
+          onTrustSender={handleTrustSender}
+          onUntrustSender={handleUntrustSender}
+          readingMode={readingMode}
+          showDetails={showDetails}
+        />
       </div>
-
-      <div className="flex-1 overflow-y-auto pr-1">
-        {newMailCount > 0 && page !== 1 && (
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="mb-3 w-full rounded-lg border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--accent)]"
-          >
-            {newMailCount} new messages · Refresh
-          </button>
-        )}
-
-        {error && (
-          <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-            {error}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
-            Loading messages...
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
-            No emails found for this filter.
-          </div>
-        ) : (
-          <EmailCards
-            msgs={messages}
-            selectedKey={selectedKey}
-            onSelect={handleSelectThread}
-            density={density}
-          />
-        )}
-      </div>
-
-      <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-        <span>
-          {total
-            ? `Showing ${startIndex}-${endIndex} of ${total}`
-            : `Showing ${startIndex}-${endIndex}`}
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            disabled={!canPrev}
-            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-              canPrev
-                ? "border-black/5 text-gray-700 hover:bg-gray-50"
-                : "cursor-not-allowed border-black/5 text-gray-300"
-            }`}
-          >
-            Prev
-          </button>
-          <span className="text-[11px] text-gray-400">Page {page}</span>
-          <button
-            type="button"
-            onClick={() => setPage((prev) => prev + 1)}
-            disabled={!canNext}
-            className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-              canNext
-                ? "border-black/5 text-gray-700 hover:bg-gray-50"
-                : "cursor-not-allowed border-black/5 text-gray-300"
-            }`}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-      </div>
-
-      <ThreadDetail
-        thread={selectedThread}
-        messages={threadMessages}
-        loading={threadLoading}
-        error={threadError}
-        onRetry={() => fetchThreadDetails(selectedThread)}
-        onMarkRead={() => updateReadState(selectedThread, false)}
-        onMarkUnread={() => updateReadState(selectedThread, true)}
-        trustedSenders={trustedSenders}
-        onTrustSender={handleTrustSender}
-        onUntrustSender={handleUntrustSender}
-        density={density}
-      />
     </div>
   );
 };

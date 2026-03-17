@@ -50,11 +50,6 @@ const userSchema = new mongoose.Schema(
       default: [],
     },
 
-    densityPreference: {
-      type: String,
-      enum: ["compact", "comfortable"],
-      default: "comfortable",
-    },
   },
   { timestamps: true }
 );

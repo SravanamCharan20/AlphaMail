@@ -149,7 +149,7 @@ userAuthRouter.get("/me", async (req, res) => {
 userAuthRouter.get("/preferences", userAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user).select(
-      "imageTrustedSenders densityPreference"
+      "imageTrustedSenders"
     );
 
     if (!user) {
@@ -158,7 +158,6 @@ userAuthRouter.get("/preferences", userAuth, async (req, res) => {
 
     res.json({
       imageTrustedSenders: user.imageTrustedSenders || [],
-      densityPreference: user.densityPreference || "comfortable",
     });
   } catch (error) {
     console.error("Error:", error.message);
@@ -172,7 +171,6 @@ userAuthRouter.patch("/preferences", userAuth, async (req, res) => {
       imageTrustedSenders,
       addTrustedSender,
       removeTrustedSender,
-      densityPreference,
     } = req.body || {};
 
     const updates = {};
@@ -190,7 +188,7 @@ userAuthRouter.patch("/preferences", userAuth, async (req, res) => {
         .toLowerCase();
 
       const user = await User.findById(req.user).select(
-        "imageTrustedSenders densityPreference"
+        "imageTrustedSenders"
       );
 
       if (!user) {
@@ -209,20 +207,14 @@ userAuthRouter.patch("/preferences", userAuth, async (req, res) => {
       updates.imageTrustedSenders = Array.from(existing);
     }
 
-    if (densityPreference) {
-      updates.densityPreference =
-        densityPreference === "compact" ? "compact" : "comfortable";
-    }
-
     const updated = await User.findByIdAndUpdate(
       req.user,
       { $set: updates },
-      { new: true, select: "imageTrustedSenders densityPreference" }
+      { new: true, select: "imageTrustedSenders" }
     );
 
     res.json({
       imageTrustedSenders: updated?.imageTrustedSenders || [],
-      densityPreference: updated?.densityPreference || "comfortable",
     });
   } catch (error) {
     console.error("Error:", error.message);

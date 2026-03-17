@@ -162,18 +162,15 @@ const ThreadDetail = ({
   messages,
   loading,
   error,
-  onMarkRead,
-  onMarkUnread,
   onRetry,
   trustedSenders = [],
   onTrustSender,
   onUntrustSender,
-  density = "comfortable",
+  readingMode = "clean",
+  showDetails = false,
 }) => {
   const [showImages, setShowImages] = useState(true);
   const [expandedQuotes, setExpandedQuotes] = useState({});
-  const [readingMode, setReadingMode] = useState("clean");
-  const [showDetails, setShowDetails] = useState(false);
   const [frameHeights, setFrameHeights] = useState({});
 
   const trustedSet = useMemo(() => {
@@ -186,7 +183,6 @@ const ThreadDetail = ({
 
   useEffect(() => {
     setExpandedQuotes({});
-    setReadingMode("clean");
     setFrameHeights({});
   }, [thread?.threadId, thread?.account]);
 
@@ -283,8 +279,7 @@ const ThreadDetail = ({
     thread.from ||
     "Sender details will appear here.";
   const hasImages = messages?.some((msg) => msg.hasImages);
-  const imagesVisible = readingMode !== "clean" && showImages;
-  const compact = density === "compact";
+  const imagesVisible = readingMode === "raw" && showImages;
   const senderEmail = extractEmailAddress(
     latestMessage?.from || thread.from || ""
   );
@@ -297,7 +292,7 @@ const ThreadDetail = ({
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <div className="relative rounded-[24px] border border-black/5 bg-white/92 px-4 py-3 shadow-[0_12px_26px_rgba(15,23,42,0.05)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 lg:pr-72 xl:pr-80">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span
@@ -334,146 +329,6 @@ const ThreadDetail = ({
             ) : null}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 lg:hidden">
-          <div className="flex items-center gap-1 rounded-full border border-black/5 bg-white p-1 text-[11px] font-semibold text-gray-600">
-            <button
-              type="button"
-              onClick={() => setReadingMode("clean")}
-              className={`rounded-full px-2.5 py-1 transition ${
-                readingMode === "clean"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Clean view
-            </button>
-            <button
-              type="button"
-              onClick={() => setReadingMode("original")}
-              className={`rounded-full px-2.5 py-1 transition ${
-                readingMode === "original"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Original HTML
-            </button>
-            <button
-              type="button"
-              onClick={() => setReadingMode("raw")}
-              className={`rounded-full px-2.5 py-1 transition ${
-                readingMode === "raw"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Raw HTML
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {hasImages ? (
-              <button
-                type="button"
-                onClick={() => setShowImages((prev) => !prev)}
-                disabled={readingMode === "clean"}
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                  readingMode !== "clean"
-                    ? "border-black/5 text-gray-700 hover:bg-gray-50"
-                    : "cursor-not-allowed border-black/5 text-gray-300"
-                }`}
-              >
-                {readingMode !== "clean"
-                  ? showImages
-                    ? "Hide images"
-                    : "Show images"
-                  : "Images hidden"}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={thread.isUnread ? onMarkRead : onMarkUnread}
-              className="rounded-full border border-black/5 px-3 py-1 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50"
-            >
-              {thread.isUnread ? "Mark as read" : "Mark as unread"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowDetails((prev) => !prev)}
-              className="rounded-full border border-black/5 px-3 py-1 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50"
-            >
-              {showDetails ? "Hide details" : "Show details"}
-            </button>
-          </div>
-        </div>
-        <div className="hidden lg:flex absolute right-3 top-3 items-center gap-2 rounded-full border border-black/5 bg-white/90 p-1 shadow-sm">
-          <div className="flex items-center gap-1 text-[11px] font-semibold text-gray-600">
-            <button
-              type="button"
-              onClick={() => setReadingMode("clean")}
-              className={`rounded-full px-2.5 py-1 transition ${
-                readingMode === "clean"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Clean
-            </button>
-            <button
-              type="button"
-              onClick={() => setReadingMode("original")}
-              className={`rounded-full px-2.5 py-1 transition ${
-                readingMode === "original"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Original
-            </button>
-            <button
-              type="button"
-              onClick={() => setReadingMode("raw")}
-              className={`rounded-full px-2.5 py-1 transition ${
-                readingMode === "raw"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              Raw
-            </button>
-          </div>
-          {hasImages ? (
-            <button
-              type="button"
-              onClick={() => setShowImages((prev) => !prev)}
-              disabled={readingMode === "clean"}
-              className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                readingMode !== "clean"
-                  ? "border-black/5 text-gray-700 hover:bg-gray-50"
-                  : "cursor-not-allowed border-black/5 text-gray-300"
-              }`}
-            >
-              {readingMode !== "clean"
-                ? showImages
-                  ? "Hide images"
-                  : "Show images"
-                : "Images hidden"}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={thread.isUnread ? onMarkRead : onMarkUnread}
-            className="rounded-full border border-black/5 px-3 py-1 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50"
-          >
-            {thread.isUnread ? "Read" : "Unread"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDetails((prev) => !prev)}
-            className="rounded-full border border-black/5 px-3 py-1 text-[11px] font-semibold text-gray-700 transition hover:bg-gray-50"
-          >
-            {showDetails ? "Hide details" : "Show details"}
-          </button>
-        </div>
       </div>
 
       <div
@@ -501,17 +356,9 @@ const ThreadDetail = ({
             <div className="flex flex-col gap-3">
               {messages.map((message, index) => {
                 const isLatest = index === messages.length - 1;
-                const htmlSource =
-                  readingMode === "original"
-                    ? normalizeHtml(message.bodyHtml || "")
-                    : normalizeHtml(
-                        message.bodyHtmlNoImages || message.bodyHtml || ""
-                      );
-                const htmlToUse = imagesVisible
-                  ? htmlSource
-                  : normalizeHtml(
-                      message.bodyHtmlNoImages || message.bodyHtml || ""
-                    );
+                const htmlToUse = normalizeHtml(
+                  message.bodyHtmlNoImages || message.bodyHtml || ""
+                );
                 const textBody = normalizeText(
                   message.bodyText || message.snippet || ""
                 );
@@ -537,25 +384,21 @@ const ThreadDetail = ({
                 const rawHtmlWithCss = injectRawCss(rawHtml, rawCss);
 
                 const contentClass =
-                  readingMode === "original"
-                    ? "email-content email-content--original"
-                    : "email-content email-content--clean";
+                  "email-content email-content--clean";
 
                 return (
                   <details
                     key={message.id || `${message.threadId}-${index}`}
                     open={isLatest}
-                    className={`rounded-2xl border border-black/5 bg-white shadow-[0_8px_18px_rgba(15,23,42,0.04)] ${
-                      compact ? "px-3 py-2" : "px-4 py-3"
-                    }`}
+                    className="rounded-2xl border border-black/5 bg-white px-4 py-3 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
                   >
                     <summary className="cursor-pointer list-none">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                          <p className={`${compact ? "text-xs" : "text-sm"} font-semibold text-gray-900`}>
+                          <p className="text-sm font-semibold text-gray-900">
                             {message.from || "Unknown sender"}
                           </p>
-                          <p className={`${compact ? "text-[10px]" : "text-[11px]"} text-gray-500`}>
+                          <p className="text-[11px] text-gray-500">
                             To: {message.to || "Unknown recipient"}
                           </p>
                         </div>
