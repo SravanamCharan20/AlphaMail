@@ -586,7 +586,7 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-white"
+                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-700"
                 aria-haspopup="menu"
                 aria-expanded={accountMenuOpen}
               >
@@ -665,7 +665,7 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-white"
+                className="inline-flex items-center gap-2 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-sky-50 hover:text-sky-700"
                 aria-haspopup="menu"
                 aria-expanded={dateMenuOpen}
               >
@@ -749,7 +749,7 @@ const EmailSidebar = () => {
                 <button
                   type="button"
                   onClick={handleRefresh}
-                  className="mb-3 w-full rounded-lg border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--accent)]"
+                  className="mb-3 w-full rounded-lg border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-3 py-2 text-xs font-semibold text-[color:var(--accent)] transition hover:bg-indigo-100"
                 >
                   {newMailCount} new messages · Refresh
                 </button>
@@ -792,7 +792,7 @@ const EmailSidebar = () => {
                 disabled={!canPrev}
                 className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
                   canPrev
-                    ? "border-black/5 text-gray-700 hover:bg-gray-50"
+                    ? "border-black/5 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
                     : "cursor-not-allowed border-black/5 text-gray-300"
                 }`}
               >
@@ -805,7 +805,7 @@ const EmailSidebar = () => {
                 disabled={!canNext}
                 className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
                   canNext
-                    ? "border-black/5 text-gray-700 hover:bg-gray-50"
+                    ? "border-black/5 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700"
                     : "cursor-not-allowed border-black/5 text-gray-300"
                 }`}
               >
@@ -818,14 +818,14 @@ const EmailSidebar = () => {
 
       <div className="flex min-h-0 flex-col gap-3">
         <div className="flex items-center justify-end">
-          <div className="flex flex-wrap items-center gap-1 rounded-full border border-black/5 bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold text-gray-600 shadow-sm">
+          <div className="flex flex-wrap items-center gap-1 rounded-full border border-[color:var(--accent-soft)] bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold text-gray-600 shadow-[0_8px_18px_rgba(99,102,241,0.12)]">
             <button
               type="button"
               onClick={() => setReadingMode("clean")}
               className={`rounded-full px-2 py-0.5 transition ${
                 readingMode === "clean"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-[linear-gradient(135deg,#6366f1_0%,#a855f7_100%)] text-white shadow-sm"
+                  : "text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
               }`}
             >
               Clean
@@ -835,8 +835,8 @@ const EmailSidebar = () => {
               onClick={() => setReadingMode("raw")}
               className={`rounded-full px-2 py-0.5 transition ${
                 readingMode === "raw"
-                  ? "bg-[var(--accent)] text-white"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "bg-[linear-gradient(135deg,#38bdf8_0%,#22d3ee_100%)] text-white shadow-sm"
+                  : "text-gray-600 hover:bg-sky-50 hover:text-sky-700"
               }`}
             >
               Raw
@@ -852,7 +852,7 @@ const EmailSidebar = () => {
               disabled={!selectedThread}
               className={`rounded-full px-2 py-0.5 transition ${
                 selectedThread
-                  ? "text-gray-600 hover:bg-gray-100"
+                  ? "text-gray-600 hover:bg-emerald-50 hover:text-emerald-700"
                   : "cursor-not-allowed text-gray-300"
               }`}
             >
@@ -865,8 +865,8 @@ const EmailSidebar = () => {
               className={`rounded-full px-2 py-0.5 transition ${
                 selectedThread
                   ? showDetails
-                    ? "bg-[var(--accent-soft)] text-[color:var(--accent)]"
-                    : "text-gray-600 hover:bg-gray-100"
+                    ? "bg-amber-100 text-amber-700"
+                    : "text-gray-600 hover:bg-amber-50 hover:text-amber-700"
                   : "cursor-not-allowed text-gray-300"
               }`}
             >

@@ -132,6 +132,12 @@ const Navbar = () => {
 
   if (loading && !user) return null;
 
+  const quickModeStyles = [
+    "bg-white text-neutral-900 shadow-sm",
+    "bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25",
+    "bg-amber-400/15 text-amber-200 hover:bg-amber-400/25",
+  ];
+
   return (
     <nav className="fixed top-0 left-1/2 -translate-x-1/2 z-50">
       {toast && (
@@ -158,33 +164,25 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="w-[min(94vw,700px)] px-3 rounded-b-[30px] border border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(255,255,255,0.86)_100%)] backdrop-blur px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out]">
+      <div className="relative w-[min(94vw,700px)] rounded-b-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,15,16,0.92)_0%,rgba(6,6,8,0.96)_100%)] ring-1 ring-white/5 backdrop-blur-2xl px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="h-9 w-9 rounded-full border border-black/5 bg-white/90 grid place-items-center shadow-sm"
+              className="h-9 w-9 rounded-full border border-white/10 bg-white/10 text-white grid place-items-center shadow-sm"
               aria-label="AlphaMail home"
             >
               <FiActivity className="text-[18px]" />
             </button>
-            <div className="hidden sm:flex flex-col leading-tight">
-              <span className="font-display text-sm font-semibold text-neutral-900">
-                AlphaMail
-              </span>
-              <span className="text-[10px] text-neutral-500">
-                Focused inbox
-              </span>
-            </div>
-            <div className="hidden lg:flex items-center gap-1 rounded-full bg-neutral-100/80 p-1 border border-black/5">
+            <div className="hidden lg:flex items-center gap-1 rounded-full bg-white/5 p-1 border border-white/10">
               {["N", "D", "F"].map((label, idx) => (
                 <button
                   key={label}
                   type="button"
                   className={
                     idx === 0
-                      ? "h-7 w-7 rounded-lg bg-[var(--accent)] text-white text-xs font-semibold shadow-sm"
-                      : "h-7 w-7 rounded-lg bg-white text-neutral-600 text-xs font-semibold"
+                      ? "h-7 w-7 rounded-lg bg-white text-neutral-900 text-xs font-semibold shadow-sm"
+                      : "h-7 w-7 rounded-lg bg-white/10 text-white/70 text-xs font-semibold"
                   }
                 >
                   {label}
@@ -194,7 +192,7 @@ const Navbar = () => {
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
-            <div className="flex w-[220px] items-center gap-2 rounded-full border border-black/5 bg-neutral-50/90 px-3 py-1.5 text-neutral-500">
+            <div className="flex w-[220px] items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-white/60">
               <FiSearch className="text-[16px]" />
               <span className="text-[11px]">Search mail</span>
             </div>
@@ -203,7 +201,7 @@ const Navbar = () => {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-black/5 bg-white px-3 py-1.5 text-[11px] font-semibold text-neutral-700 shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/80 shadow-sm"
               aria-label="Filters"
             >
               <span className="hidden sm:inline">Filters</span>
@@ -212,7 +210,7 @@ const Navbar = () => {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold text-[color:var(--accent)] ring-1 ring-[color:var(--accent-soft)]"
+              className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-semibold text-white ring-1 ring-white/10"
             >
               AI
             </button>
@@ -230,7 +228,7 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="h-9 w-9 rounded-full cursor-pointer bg-neutral-100/80 text-neutral-700 grid place-items-center text-xs font-semibold ring-1 ring-black/5"
+                className="h-9 w-9 rounded-full cursor-pointer bg-white/10 text-white grid place-items-center text-xs font-semibold ring-1 ring-white/10"
                 aria-haspopup="menu"
                 aria-expanded={open}
               >

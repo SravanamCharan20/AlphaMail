@@ -51,7 +51,7 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/92 shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+    <div className="overflow-hidden cursor-pointer rounded-2xl border border-black/5 bg-white/92 shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
       {msgs.map((mail, index) => {
         const isSelected =
           selectedKey && selectedKey === getThreadKey(mail);
@@ -66,9 +66,9 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                 onSelect?.(mail);
               }
             }}
-            className={`group relative w-full text-left px-3.5 py-3 transition ${
+            className={`group relative cursor-pointer w-full text-left px-3.5 py-3 transition ${
               isSelected
-                ? "bg-[var(--accent-soft)]/60"
+                ? "bg-slate-300/30"
                 : "hover:bg-black/5"
             } border-b border-black/5 last:border-b-0`}
           >
@@ -119,7 +119,7 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                 </p>
 
                 <div className="mt-2">
-                  <span className="inline-flex items-center rounded-full border border-black/5 bg-white px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                  <span className="inline-flex items-center rounded-full border border-[color:var(--accent-soft)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--accent)]">
                     To: {getToLabel(mail.to) || mail.account || "Recipient"}
                   </span>
                 </div>

@@ -439,7 +439,7 @@ const ThreadDetail = ({
             : "grid-cols-1"
         }`}
       >
-        <div className="min-h-0 overflow-y-auto rounded-[26px] border border-black/5 bg-white p-5 shadow-[0_14px_28px_rgba(15,23,42,0.05)]">
+        <div className="min-h-0 overflow-y-auto rounded-[26px] border border-black/5 bg-purple-50 p-5 shadow-[0_14px_28px_rgba(15,23,42,0.05)]">
           <div className="-mx-5 -mt-5 mb-4 border-b border-black/5 bg-white/95 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
