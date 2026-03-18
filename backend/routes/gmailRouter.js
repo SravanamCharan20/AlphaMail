@@ -2,7 +2,9 @@ import express from "express";
 import userAuth from "../middlewares/auth.js";
 import { emailQueue } from "../queues/emailQueue.js";
 import Email from "../models/Email.js";
+import EmailEmbedding from "../models/EmailEmbedding.js";
 import EmailAccount from "../models/EmailAccount.js";
+import mongoose from "mongoose";
 import { verifyPubSubJwt } from "../services/pubsubAuth.js";
 import { createGmailClient } from "../services/gmailClient.js";
 import { publishSocketEvent } from "../services/socketPubSub.js";
@@ -15,6 +17,8 @@ import {
   getHeaderValue,
   normalizeContentId,
 } from "../services/emailContent.js";
+import { embedTexts } from "../services/embeddingService.js";
+import { normalizeText } from "../services/textChunker.js";
 
 const gmailRouter = express.Router();
 
@@ -186,6 +190,139 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
     limit,
     hasNext: page * limit < total,
   });
+});
+
+gmailRouter.get("/search", userAuth, async (req, res) => {
+  try {
+    const userId = req.user;
+    const queryRaw = req.query.q || req.query.query || "";
+    const queryText = normalizeText(queryRaw);
+    if (!queryText) {
+      return res.status(400).json({ message: "Missing query text" });
+    }
+
+    const account = req.query.account;
+    const range = (req.query.range || "all").toLowerCase();
+    const tzOffset = parseInt(req.query.tzOffset, 10);
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 10, 1),
+      50
+    );
+    const labelsParam = req.query.labels;
+    const labels = labelsParam
+      ? String(labelsParam)
+          .split(",")
+          .map((label) => label.trim())
+          .filter(Boolean)
+      : [];
+
+    let userObjectId;
+    try {
+      userObjectId = new mongoose.Types.ObjectId(userId);
+    } catch (error) {
+      return res.status(400).json({ message: "Invalid user id" });
+    }
+
+    let queryVector = null;
+    try {
+      const vectors = await embedTexts([queryText]);
+      queryVector = vectors?.[0];
+    } catch (error) {
+      console.error("[search] Embedding failed", error);
+      return res.status(500).json({
+        message: "Embedding failed",
+        ...(process.env.NODE_ENV !== "production" && {
+          details: error?.message || String(error),
+        }),
+      });
+    }
+
+    if (!queryVector?.length) {
+      return res.status(500).json({ message: "Embedding failed" });
+    }
+
+    const filter = {
+      userId: userObjectId,
+    };
+
+    if (account) {
+      filter.account = account;
+    }
+
+    const bounds = getDateRangeBounds(range, tzOffset);
+    if (bounds) {
+      filter.receivedAt = { $gte: bounds.start, $lte: bounds.end };
+    }
+
+    if (labels.length) {
+      filter.labels = { $in: labels };
+    }
+
+    const searchLimit = Math.min(limit * 3, 60);
+    const numCandidates = Math.min(searchLimit * 20, 1000);
+
+    const pipeline = [
+      {
+        $vectorSearch: {
+          index: "email_embeddings_vector",
+          path: "embedding",
+          queryVector,
+          numCandidates,
+          limit: searchLimit,
+          filter,
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          chunkText: 1,
+          threadId: 1,
+          messageId: 1,
+          account: 1,
+          receivedAt: 1,
+          subject: 1,
+          from: 1,
+          labels: 1,
+          score: { $meta: "vectorSearchScore" },
+        },
+      },
+    ];
+
+    let rawResults = [];
+    try {
+      rawResults = await EmailEmbedding.aggregate(pipeline);
+    } catch (error) {
+      console.error("[search] Vector search failed", error);
+      return res.status(500).json({
+        message: "Vector search failed",
+        ...(process.env.NODE_ENV !== "production" && {
+          details: error?.message || String(error),
+        }),
+      });
+    }
+
+    const grouped = new Map();
+    rawResults.forEach((item) => {
+      const key = `${item.account || ""}::${item.threadId || item.messageId}`;
+      const current = grouped.get(key);
+      if (!current || item.score > current.score) {
+        grouped.set(key, item);
+      }
+    });
+
+    const results = Array.from(grouped.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return res.json({
+      query: queryText,
+      count: results.length,
+      results,
+    });
+  } catch (error) {
+    console.error("[search] semantic search failed", error);
+    return res.status(500).json({ message: "Semantic search failed" });
+  }
 });
 
 gmailRouter.get("/threads/:threadId", userAuth, async (req, res) => {

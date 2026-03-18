@@ -1,13 +1,44 @@
 import React from "react";
 import { getThreadKey } from "../emailUtils";
 
-const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
+const escapeRegex = (value) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const EmailCards = ({
+  msgs,
+  selectedKey,
+  onSelect,
+  now,
+  highlightQuery = "",
+}) => {
   const nowTs =
     typeof now === "number"
       ? now
       : now
       ? new Date(now).getTime()
       : 0;
+  const normalizedQuery = highlightQuery.trim();
+
+  const renderHighlightedText = (text) => {
+    if (!normalizedQuery || normalizedQuery.length < 2) {
+      return text;
+    }
+    const safeQuery = escapeRegex(normalizedQuery);
+    const regex = new RegExp(`(${safeQuery})`, "ig");
+    const parts = String(text || "").split(regex);
+    return parts.map((part, idx) =>
+      regex.test(part) ? (
+        <mark
+          key={`${part}-${idx}`}
+          className="rounded bg-[var(--accent-soft)] px-1 text-[color:var(--accent)]"
+        >
+          {part}
+        </mark>
+      ) : (
+        <span key={`${part}-${idx}`}>{part}</span>
+      )
+    );
+  };
   const formatDate = (value) => {
     if (!value) return "";
     const parsed = new Date(value);
@@ -102,6 +133,15 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                       New
                     </span>
                   ) : null}
+                  {typeof mail.searchScore === "number" ? (
+                    <span className="rounded-full border border-black/10 bg-white/80 px-2 py-0.5 font-semibold text-[color:var(--ink)]">
+                      Match{" "}
+                      {Math.round(
+                        Math.min(Math.max(mail.searchScore, 0), 1) * 100
+                      )}
+                      %
+                    </span>
+                  ) : null}
                 </div>
 
                 <p
@@ -109,7 +149,11 @@ const EmailCards = ({ msgs, selectedKey, onSelect, now }) => {
                     mail.isUnread ? "text-gray-700" : "text-gray-500"
                   }`}
                 >
-                  {mail.snippet || "No preview available."}
+                  {renderHighlightedText(
+                    mail.searchSnippet ||
+                      mail.snippet ||
+                      "No preview available."
+                  )}
                 </p>
 
                 <div className="mt-2">

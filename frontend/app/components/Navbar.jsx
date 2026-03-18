@@ -13,6 +13,7 @@ import {
 } from "react-icons/fi";
 import { useUser } from "../utils/userContext";
 import { API_BASE, apiFetch } from "../utils/api";
+import Link from 'next/link'
 
 const Navbar = () => {
   const { user, loading } = useUser();
@@ -20,6 +21,7 @@ const Navbar = () => {
   const [accountsOpen, setAccountsOpen] = useState(false);
   const [accounts, setAccounts] = useState([]);
   const [toast, setToast] = useState(null);
+  const [searchValue, setSearchValue] = useState("");
 
   const initials = useMemo(() => {
     if (!user?.username) return "U";
@@ -50,6 +52,14 @@ const Navbar = () => {
   const handleConnectMail = () => {
     const url = `${API_BASE}/googleAuth/google`;
     window.open(url, "_blank", "width=800,height=700");
+  };
+
+  const dispatchSearch = (value) => {
+    window.dispatchEvent(
+      new CustomEvent("semantic-search", {
+        detail: { query: value || "" },
+      })
+    );
   };
 
   const fetchAccounts = async () => {
@@ -182,7 +192,7 @@ const Navbar = () => {
               className="h-9 w-9 rounded-full border border-black/10 bg-white/80 text-black grid place-items-center shadow-sm interactive"
               aria-label="AlphaMail home"
             >
-              <FiActivity className="text-[18px]" />
+              <Link href='/'><FiActivity className="text-[18px]" /></Link>
             </button>
             <div className="hidden lg:flex items-center gap-1 rounded-full bg-white/70 p-1 border border-black/10">
               {["N", "D", "F"].map((label, idx) => (
@@ -201,9 +211,41 @@ const Navbar = () => {
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
-            <div className="flex w-[240px] items-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-[color:var(--muted)]">
+            <div className="flex w-[280px] items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[color:var(--muted)] shadow-sm">
               <FiSearch className="text-[16px] text-[color:var(--muted)]" />
-              <span className="text-[11px]">Search mail</span>
+              <input
+                value={searchValue}
+                onChange={(event) => setSearchValue(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    dispatchSearch(searchValue.trim());
+                  }
+                  if (event.key === "Escape") {
+                    setSearchValue("");
+                    dispatchSearch("");
+                  }
+                }}
+                placeholder="Search mail"
+                className="flex-1 bg-transparent text-[12px] text-[color:var(--ink)] outline-none placeholder:text-[color:var(--muted)]"
+              />
+              {searchValue ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchValue("");
+                    dispatchSearch("");
+                  }}
+                  className="text-[11px] text-[color:var(--muted)] hover:text-[color:var(--ink)]"
+                  aria-label="Clear search"
+                >
+                  ✕
+                </button>
+              ) : (
+                <span className="rounded-full border border-black/10 px-2 py-0.5 text-[10px] text-[color:var(--muted)]">
+                  ↵
+                </span>
+              )}
             </div>
           </div>
 

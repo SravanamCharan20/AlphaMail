@@ -38,6 +38,11 @@ const EmailSidebar = () => {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const [newTagNow, setNewTagNow] = useState(Date.now());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchCount, setSearchCount] = useState(0);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
 
   const filtersRef = useRef({ account: "all", range: "all" });
   const lastFiltersRef = useRef({ account: "all", range: "all" });
@@ -46,10 +51,12 @@ const EmailSidebar = () => {
   const fetchAbortRef = useRef(null);
   const selectedThreadRef = useRef(null);
   const newTagMapRef = useRef(new Map());
+  const searchQueryRef = useRef("");
 
   const tzOffset = useMemo(() => -new Date().getTimezoneOffset(), []);
   const pageSize = 5;
   const NEW_TAG_TTL_MS = 2 * 60 * 1000;
+  const isSearchActive = searchQuery.trim().length > 0;
 
   const updateRefs = () => {
     filtersRef.current = { account: accountFilter, range: dateRange };
@@ -61,6 +68,10 @@ const EmailSidebar = () => {
   useEffect(() => {
     selectedThreadRef.current = selectedThread;
   }, [selectedThread]);
+
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
 
   useEffect(() => {
     setReadingMode("clean");
@@ -85,6 +96,26 @@ const EmailSidebar = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const handleSearch = (event) => {
+      const query = event?.detail?.query || "";
+      const trimmed = String(query).trim();
+      if (!trimmed) {
+        clearSearch();
+        return;
+      }
+      setSearchQuery(trimmed);
+    };
+
+    window.addEventListener("semantic-search", handleSearch);
+    return () => window.removeEventListener("semantic-search", handleSearch);
+  }, []);
+
+  useEffect(() => {
+    if (!searchQuery) return;
+    fetchSearchResults(searchQuery);
+  }, [searchQuery, accountFilter, dateRange]);
+
   const buildMessagesPath = (account, range, pageNumber, pageLimit) => {
     const params = new URLSearchParams();
 
@@ -100,6 +131,74 @@ const EmailSidebar = () => {
     params.set("tzOffset", String(tzOffset));
 
     return `/gmail/messages?${params.toString()}`;
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchCount(0);
+    setSearchError(null);
+  };
+
+  const fetchSearchResults = async (queryText) => {
+    const query = (queryText || "").trim();
+    if (!query) {
+      clearSearch();
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchError(null);
+
+    try {
+      const params = new URLSearchParams();
+      params.set("q", query);
+      if (accountFilter !== "all") {
+        params.set("account", accountFilter);
+      }
+      if (dateRange !== "all") {
+        params.set("range", dateRange);
+      }
+      params.set("limit", "25");
+      params.set("tzOffset", String(tzOffset));
+
+      const res = await apiFetch(`/gmail/search?${params.toString()}`);
+      if (!res.ok) {
+        setSearchError("Search failed. Try again.");
+        setSearchResults([]);
+        setSearchCount(0);
+        return;
+      }
+      const data = await res.json();
+      const rawResults = Array.isArray(data?.results)
+        ? data.results
+        : [];
+
+      const mapped = rawResults.map((item, index) => ({
+        _id: item.messageId || `${item.threadId}-${index}`,
+        threadId: item.threadId,
+        account: item.account,
+        subject: item.subject,
+        from: item.from,
+        receivedAt: item.receivedAt,
+        snippet: item.chunkText,
+        searchSnippet: item.chunkText,
+        searchScore: item.score,
+        isUnread: false,
+      }));
+
+      setSearchResults(mapped);
+      setSearchCount(
+        typeof data?.count === "number" ? data.count : mapped.length
+      );
+    } catch (error) {
+      console.warn("Search failed", error);
+      setSearchError("Search failed. Try again.");
+      setSearchResults([]);
+      setSearchCount(0);
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   const fetchPreferences = async () => {
@@ -308,6 +407,10 @@ const EmailSidebar = () => {
   };
 
   const handleRefresh = () => {
+    if (searchQueryRef.current) {
+      fetchSearchResults(searchQueryRef.current);
+      return;
+    }
     if (page !== 1) {
       setPage(1);
       return;
@@ -328,6 +431,10 @@ const EmailSidebar = () => {
   useEffect(() => {
     const handleAccountsUpdate = () => {
       fetchAccounts();
+      if (searchQueryRef.current) {
+        fetchSearchResults(searchQueryRef.current);
+        return;
+      }
       if (pageRef.current !== 1) {
         setPage(1);
         return;
@@ -354,8 +461,12 @@ const EmailSidebar = () => {
       }
     }
 
+    if (searchQuery) {
+      return;
+    }
+
     fetchMessages();
-  }, [accountFilter, dateRange, page, pageSize]);
+  }, [accountFilter, dateRange, page, pageSize, searchQuery]);
 
   useEffect(() => {
     setNewMailCount(0);
@@ -410,6 +521,9 @@ const EmailSidebar = () => {
     });
 
     socket.on("email-added", (email) => {
+      if (searchQueryRef.current) {
+        return;
+      }
       const filters = filtersRef.current;
       if (!matchesFilters(email, filters)) {
         return;
@@ -511,14 +625,29 @@ const EmailSidebar = () => {
     return until;
   };
 
-  const canPrev = page > 1;
+  const listItems = isSearchActive ? searchResults : messages;
+  const listError = isSearchActive ? searchError : error;
+  const listLoading = isSearchActive ? searchLoading : loading;
+  const listTotal = isSearchActive ? searchCount : total;
+
+  const canPrev = !isSearchActive && page > 1;
   const fallbackNext =
     total ? page * pageSize < total : messages.length === pageSize;
-  const canNext = hasNext !== null ? hasNext : fallbackNext;
-  const startIndex = messages.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const endIndex = total
-    ? Math.min(page * pageSize, total)
-    : (page - 1) * pageSize + messages.length;
+  const canNext = !isSearchActive && (hasNext !== null ? hasNext : fallbackNext);
+  const startIndex =
+    listItems.length === 0
+      ? 0
+      : isSearchActive
+      ? 1
+      : (page - 1) * pageSize + 1;
+  const endIndex =
+    listItems.length === 0
+      ? 0
+      : isSearchActive
+      ? listItems.length
+      : listTotal
+      ? Math.min(page * pageSize, listTotal)
+      : (page - 1) * pageSize + listItems.length;
 
   const selectedKey = selectedThread ? getThreadKey(selectedThread) : "";
   const accountLabel = accountFilter === "all" ? "All inbox" : accountFilter;
@@ -586,7 +715,7 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
+                className="inline-flex items-center gap-2 truncate rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={accountMenuOpen}
               >
@@ -729,7 +858,7 @@ const EmailSidebar = () => {
                   className={`h-2 w-2 rounded-full ${
                     syncing
                       ? "bg-[var(--accent)] animate-pulse"
-                      : "bg-black/50"
+                      : "bg-green-500"
                   }`}
                 />
                 <span>{syncing ? "Syncing" : "Up to date"}</span>
@@ -737,19 +866,38 @@ const EmailSidebar = () => {
                   <FaSpinner className="animate-spin text-[color:var(--accent)]" />
                 )}
               </div>
-              <div className="hidden sm:flex items-center gap-2 text-gray-500">
-                <span className="kbd">⌘</span>
-                <span className="kbd">K</span>
-              </div>
               <div className="flex items-center gap-1 text-gray-500">
-                <span>Emails:</span>
+                <span>{isSearchActive ? "Results" : "Emails"}:</span>
                 <span className="text-gray-700">
-                  {total || messages.length}
+                  {isSearchActive
+                    ? searchCount || listItems.length
+                    : total || messages.length}
                 </span>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto pr-1 scrollbar-subtle">
-              {newMailCount > 0 && page !== 1 && (
+              {isSearchActive && (
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-xs text-[color:var(--muted)]">
+                  <div>
+                    <p className="text-[11px] font-semibold text-[color:var(--ink)]">
+                      Search results for “{searchQuery}”
+                    </p>
+                    <p className="text-[11px] text-[color:var(--muted)]">
+                      {searchCount || listItems.length} matches · {accountLabel} ·{" "}
+                      {dateLabel}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--ink)] hover:bg-black/5"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
+              {!isSearchActive && newMailCount > 0 && page !== 1 && (
                 <button
                   type="button"
                   onClick={handleRefresh}
@@ -759,30 +907,34 @@ const EmailSidebar = () => {
                 </button>
               )}
 
-              {error && (
+              {listError && (
                 <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                  {error}
+                  {listError}
                 </div>
               )}
 
-              {loading ? (
+              {listLoading ? (
                 <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
-                  Loading messages...
+                  {isSearchActive ? "Searching..." : "Loading messages..."}
                 </div>
-              ) : messages.length === 0 ? (
+              ) : listItems.length === 0 ? (
                 <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
-                  No emails found for this filter.
+                  {isSearchActive
+                    ? "No results found for this search."
+                    : "No emails found for this filter."}
                 </div>
               ) : (
                 <EmailCards
-                  msgs={messages}
+                  msgs={listItems}
                   selectedKey={selectedKey}
                   onSelect={handleSelectThread}
                   now={newTagNow}
+                  highlightQuery={isSearchActive ? searchQuery : ""}
                 />
               )}
             </div>
 
+          {!isSearchActive && (
           <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
             <span>
               {total
@@ -817,6 +969,7 @@ const EmailSidebar = () => {
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import EmailAccount from "../models/EmailAccount.js";
 import Email from "../models/Email.js";
 import { publishSocketEvent } from "./socketPubSub.js";
 import { createGmailClient } from "./gmailClient.js";
+import { indexGmailMessageEmbeddings } from "./embeddingIndexer.js";
 
 const getHeaderValue = (headers, name) =>
   headers.find((header) => header.name === name)?.value;
@@ -81,7 +82,6 @@ const upsertEmailAndPublish = async ({
   return result;
 };
 
-
 export const syncUserEmails = async (userId) => {
   try {
     const accounts = await EmailAccount.find({ userId }).select(
@@ -104,6 +104,7 @@ export const syncUserEmails = async (userId) => {
           gmail.users.threads.get({
             userId: "me",
             id: thread.id,
+            format: "full",
           })
         )
       );
@@ -124,6 +125,20 @@ export const syncUserEmails = async (userId) => {
           syncSource: "initial",
           isIncremental: false,
         });
+
+        try {
+          await indexGmailMessageEmbeddings({
+            userId,
+            account: account.email,
+            message,
+            threadIdOverride: threadData.data.id,
+          });
+        } catch (err) {
+          console.warn(
+            "[embedding] Initial sync embed failed",
+            err?.message || err
+          );
+        }
       }
     }
 
@@ -140,7 +155,9 @@ export const watchMailboxForAccount = async (account) => {
   }
 
   const labelIds = process.env.PUBSUB_LABELS
-    ? process.env.PUBSUB_LABELS.split(",").map((label) => label.trim()).filter(Boolean)
+    ? process.env.PUBSUB_LABELS.split(",")
+        .map((label) => label.trim())
+        .filter(Boolean)
     : ["INBOX"];
 
   const gmail = createGmailClient(account);
@@ -176,7 +193,10 @@ export const watchMailboxForAccount = async (account) => {
   return response?.data;
 };
 
-export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => {
+export const syncIncrementalForAccount = async ({
+  emailAddress,
+  historyId,
+}) => {
   console.log("[gmail] Incremental sync start", { emailAddress, historyId });
   const account = await EmailAccount.findOne({ email: emailAddress });
   if (!account) {
@@ -207,7 +227,10 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
       historyTypes: ["messageAdded", "labelAdded", "labelRemoved"],
     };
 
-    if (Array.isArray(account.watchLabels) && account.watchLabels.length === 1) {
+    if (
+      Array.isArray(account.watchLabels) &&
+      account.watchLabels.length === 1
+    ) {
       historyParams.labelId = account.watchLabels[0];
     }
 
@@ -282,8 +305,7 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
       gmail.users.messages.get({
         userId: "me",
         id,
-        format: "metadata",
-        metadataHeaders: ["Subject", "From", "Date"],
+        format: "full",
       })
     )
   );
@@ -306,6 +328,19 @@ export const syncIncrementalForAccount = async ({ emailAddress, historyId }) => 
       threadId: emailPayload?.threadId,
       upserted: result?.upsertedId ? true : false,
     });
+
+    try {
+      await indexGmailMessageEmbeddings({
+        userId: account.userId,
+        account: account.email,
+        message,
+      });
+    } catch (err) {
+      console.warn(
+        "[embedding] Incremental embed failed",
+        err?.message || err
+      );
+    }
   }
 
   for (const [threadId, isUnread] of threadReadUpdates.entries()) {

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "backfill:received-at": "node scripts/backfill-received-at.js"
+    "preload:embeddings": "python3 workers/preload_embeddings.py"
   },
   "keywords": [],
   "author": "",

@@ -33,6 +33,12 @@ const EntryPage = () => {
             >
               Create account
             </Link>
+            <Link
+              href="/dashboard"
+              className="inline-flex w-full items-center justify-center rounded-full border border-black/10 bg-white/70 px-6 py-3 text-sm font-semibold text-[color:var(--ink)] shadow-sm backdrop-blur transition hover:bg-white sm:w-auto"
+            >
+              Dashboard
+            </Link>
           </div>
 
           <div className="mt-10 grid gap-3 sm:grid-cols-3">
