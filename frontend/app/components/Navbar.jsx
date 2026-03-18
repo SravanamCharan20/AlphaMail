@@ -12,6 +12,7 @@ import {
   FiPlus,
   FiSearch,
   FiUser,
+  FiActivity,
 } from "react-icons/fi";
 import { useUser } from "../utils/userContext";
 import { API_BASE, apiFetch } from "../utils/api";
@@ -218,7 +219,7 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="relative w-[min(92vw,720px)] left-3.5 top-1.5 rounded-full border border-black/10 bg-white/85 shadow-[0_16px_40px_rgba(15,23,42,0.12) backdrop-blur-xl px-4 py-2 animate-[fadeUp_0.35s_ease-out]">
+      <div className="relative w-[min(92vw,720px)] left-3.5 top-2 rounded-full border border-black/10 bg-white/85 shadow-[0_16px_40px_rgba(15,23,42,0.12) backdrop-blur-xl px-4 py-2 animate-[fadeUp_0.35s_ease-out]">
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Link
@@ -226,16 +227,16 @@ const Navbar = () => {
               className="nav-crest interactive"
               aria-label="AlphaMail home"
             >
-              <span className="nav-crest-letter">A</span>
+              <span className="text-md"><FiActivity/></span>
             </Link>
             <span className="hidden sm:inline text-[16px] font-sans font-semibold text-[color:var(--ink)]">
-              ALPHAMAIL
+              Alpha<span className="text-blue-500/90">Mail</span>
             </span>
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
             <div
-              className="flex p-2 w-[300px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-4 text-[color:var(--muted)] shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
+              className="flex p-2 w-[300px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-2.5"
               title={
                 isSearchDisabled
                   ? "Syncing/embedding in progress. Search will be available after completion."
@@ -293,7 +294,7 @@ const Navbar = () => {
             </div>
           </div>
 
-          <div className="flex items-center border border-slate-500/20 rounded-full p-1 gap-2">
+          <div className="flex items-center border border-slate-800/20 rounded-full p-1 gap-2.5">
             <div
               className="relative"
               tabIndex={0}
@@ -381,7 +382,7 @@ const Navbar = () => {
 
             <button
               type="button"
-              className="inline-flex cursor-pointer h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-[#8e81db] to-[#8d39db] text-[11px] font-semibold text-white shadow-[0_12px_24px_rgba(66,133,244,0.25)] interactive"
+              className="inline-flex cursor-pointer h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-[#8e81db] to-[#8d39db] text-[11px] font-semibold text-white interactive"
             >
               AI
             </button>
@@ -516,7 +517,7 @@ const Navbar = () => {
             <button
               type="button"
               onClick={handleConnectMail}
-              className="h-8 w-8 rounded-full bg-[color:var(--accent)] cursor-pointer text-white grid place-items-center shadow-[0_12px_30px_rgba(10,132,255,0.24)] interactive"
+              className="h-8 w-8 rounded-full bg-[color:var(--accent)] cursor-pointer text-white grid place-items-center interactive"
               aria-label="Connect account"
             >
               <FiPlus className="text-[18px]" />

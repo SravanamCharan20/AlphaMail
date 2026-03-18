@@ -780,7 +780,7 @@ const EmailSidebar = () => {
   return (
     <>
       <div className="fixed left-4 sm:left-10 top-2 z-40 w-[calc(100%-rem)] sm:w-[calc(100%-2rem)] lg:w-[220px] xl:w-[830px] 2xl:w-[460px]">
-        <div className="rounded-full border border-black/10 bg-white/70 px-3 py-3.5 backdrop-blur shadow-[0_20px_60px_rgba(0,0,0,0.10)]">
+        <div className="rounded-full border border-black/10 bg-white/70 px-3 py-3.5 backdrop-blur">
           <div className="flex flex-wrap items-center gap-2 min-w-0">
             <h1 className="font-display ml-4 text-[1.15rem] font-semibold text-gray-900">
               Inbox
