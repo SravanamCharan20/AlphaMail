@@ -2,7 +2,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
-import { FiCalendar, FiChevronDown, FiInbox, FiMail } from "react-icons/fi";
+import {
+  FiCalendar,
+  FiChevronDown,
+  FiInbox,
+  FiMail,
+  FiSearch,
+  FiX,
+} from "react-icons/fi";
 import EmailCards from "./components/EmailCards";
 import ThreadDetail from "./components/ThreadDetail";
 import socket from "../../utils/socket";
@@ -680,6 +687,9 @@ const EmailSidebar = () => {
   const listError = isSearchActive ? searchError : error;
   const listLoading = isSearchActive ? searchLoading : loading;
   const listTotal = isSearchActive ? searchCount : total;
+  const totalPages = !isSearchActive && listTotal
+    ? Math.max(1, Math.ceil(listTotal / pageSize))
+    : 0;
 
   const canPrev = !isSearchActive && page > 1;
   const fallbackNext =
@@ -738,16 +748,45 @@ const EmailSidebar = () => {
     setDateMenuOpen(false);
   };
 
+  const handleCloseThread = () => {
+    setSelectedThread(null);
+    setThreadMessages([]);
+    setThreadError(null);
+  };
+
+  const getPaginationItems = (current, pages) => {
+    if (!pages || pages <= 1) return [];
+    if (pages <= 7) {
+      return Array.from({ length: pages }, (_, idx) => idx + 1);
+    }
+    const windowSize = 2;
+    const items = [];
+    const add = (value) => items.push(value);
+
+    add(1);
+    if (current - windowSize > 2) add("…");
+
+    const start = Math.max(2, current - windowSize);
+    const end = Math.min(pages - 1, current + windowSize);
+    for (let i = start; i <= end; i += 1) {
+      add(i);
+    }
+
+    if (current + windowSize < pages - 1) add("…");
+    add(pages);
+    return items;
+  };
+
   return (
     <>
-      <div className="fixed left-4 sm:left-10 top-0 z-40 w-[calc(100%-rem)] sm:w-[calc(100%-2rem)] lg:w-[220px] xl:w-[830px] 2xl:w-[460px]">
-        <div className="rounded-b-[28px] border border-black/10 bg-white/70 px-3 py-3.5 backdrop-blur shadow-[0_20px_60px_rgba(0,0,0,0.10)]">
-          <div className="flex items-center gap-3">
-            <h1 className="font-display text-[1.15rem] font-semibold text-gray-900">
+      <div className="fixed left-4 sm:left-10 top-1 z-40 w-[calc(100%-rem)] sm:w-[calc(100%-2rem)] lg:w-[220px] xl:w-[830px] 2xl:w-[460px]">
+        <div className="rounded-full border border-black/10 bg-white/70 px-3 py-3.5 backdrop-blur shadow-[0_20px_60px_rgba(0,0,0,0.10)]">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <h1 className="font-display ml-4 text-[1.15rem] font-semibold text-gray-900">
               Inbox
             </h1>
             <div
-              className="relative"
+              className="relative ml-6"
               tabIndex={0}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -766,14 +805,14 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 truncate rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
+                className="inline-flex max-w-[200px] min-w-0 items-center gap-2 truncate rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={accountMenuOpen}
               >
                 <span className="text-[9px] uppercase tracking-[0.18em] text-gray-400">
                   Account
                 </span>
-                <span className="max-w-[200px] truncate text-gray-700">
+                <span className="max-w-[120px] truncate text-gray-700">
                   {accountLabel}
                 </span>
                 <FiChevronDown
@@ -845,14 +884,14 @@ const EmailSidebar = () => {
                     return next;
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
+                className="inline-flex max-w-[160px] min-w-0 items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3.5 py-1.5 text-xs font-semibold text-gray-800 shadow-sm transition hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={dateMenuOpen}
               >
                 <span className="text-[9px] uppercase tracking-[0.18em] text-gray-400">
                   Date
                 </span>
-                <span className="text-gray-700">{dateLabel}</span>
+                <span className="truncate text-gray-700">{dateLabel}</span>
                 <FiChevronDown
                   className={`text-[14px] text-gray-500 transition ${
                     dateMenuOpen ? "rotate-180" : ""
@@ -957,23 +996,29 @@ const EmailSidebar = () => {
               )}
 
               {isSearchActive && (
-                <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-xs text-[color:var(--muted)]">
-                  <div>
-                    <p className="text-[11px] font-semibold text-[color:var(--ink)]">
-                      Search results for “{searchQuery}”
-                    </p>
-                    <p className="text-[11px] text-[color:var(--muted)]">
-                      {searchCount || listItems.length} matches · {accountLabel} ·{" "}
-                      {dateLabel}
-                    </p>
+                <div className="mb-3 rounded-2xl border border-black/10 bg-white/85 px-3 py-2 text-xs text-[color:var(--muted)] shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[color:var(--accent)]">
+                        <FiSearch className="text-[14px]" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-[color:var(--ink)]">
+                          Searching for “{searchQuery}”
+                        </p>
+                        <p className="text-[11px] text-[color:var(--muted)]">
+                          Semantic results ranked by relevance
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearSearch}
+                      className="rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--ink)] hover:bg-black/5"
+                    >
+                      Clear
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={clearSearch}
-                    className="rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--ink)] hover:bg-black/5"
-                  >
-                    Clear
-                  </button>
                 </div>
               )}
 
@@ -994,14 +1039,27 @@ const EmailSidebar = () => {
               )}
 
               {listLoading ? (
-                <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
+                <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-900">
                   {isSearchActive ? "Searching..." : "Loading messages..."}
                 </div>
               ) : listItems.length === 0 ? (
                 <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-6 text-xs text-gray-500">
-                  {isSearchActive
-                    ? "No results found for this search."
-                    : "No emails found for this filter."}
+                  {isSearchActive ? (
+                    <div className="space-y-1">
+                      <p className="text-[12px] font-semibold text-gray-700">
+                        No results found for this search.
+                      </p>
+                      <p className="text-[11px] text-gray-500">
+                        Try a shorter phrase or a different keyword.
+                      </p>
+                      <p className="text-[11px] text-gray-500">
+                        Semantic search works best with intent like “interview
+                        invite” or “refund policy”.
+                      </p>
+                    </div>
+                  ) : (
+                    "No emails found for this filter."
+                  )}
                 </div>
               ) : (
                 <EmailCards
@@ -1015,40 +1073,39 @@ const EmailSidebar = () => {
             </div>
 
           {!isSearchActive && (
-          <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-            <span>
-              {total
-                ? `Showing ${startIndex}-${endIndex} of ${total}`
-                : `Showing ${startIndex}-${endIndex}`}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={!canPrev}
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                  canPrev
-                    ? "border-black/10 text-gray-800 hover:bg-black/5"
-                    : "cursor-not-allowed border-black/10 text-gray-300"
-                }`}
-              >
-                Prev
-              </button>
-              <span className="text-[11px] text-gray-400">Page {page}</span>
-              <button
-                type="button"
-                onClick={() => setPage((prev) => prev + 1)}
-                disabled={!canNext}
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
-                  canNext
-                    ? "border-black/10 text-gray-800 hover:bg-black/5"
-                    : "cursor-not-allowed border-black/10 text-gray-300"
-                }`}
-              >
-                Next
-              </button>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+              <span>
+                {total
+                  ? `Showing ${startIndex}-${endIndex} of ${total}`
+                  : `Showing ${startIndex}-${endIndex}`}
+              </span>
+              <div className="flex max-w-full flex-wrap items-center gap-1">
+                {getPaginationItems(page, totalPages).map((item, idx) =>
+                  item === "…" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="px-2 text-[11px] text-gray-400"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={`page-${item}`}
+                      type="button"
+                      onClick={() => setPage(item)}
+                      aria-current={item === page ? "page" : undefined}
+                      className={`h-7 min-w-[28px] rounded-full  cursor-pointer border px-2 text-[11px] font-semibold transition ${
+                        item === page
+                          ? "border-black/10 bg-black text-white"
+                          : "border-black/10 text-gray-800 hover:bg-black/5"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              </div>
             </div>
-          </div>
           )}
         </div>
       </div>
@@ -1108,6 +1165,20 @@ const EmailSidebar = () => {
               }`}
             >
               Details
+            </button>
+            <span className="mx-1 h-4 w-px bg-black/10" />
+            <button
+              type="button"
+              onClick={handleCloseThread}
+              disabled={!selectedThread}
+              className={`inline-flex items-center gap-1 rounded-full cursor-pointer px-2 py-0.5 transition ${
+                selectedThread
+                  ? "text-gray-700 hover:bg-black/5"
+                  : "cursor-not-allowed text-gray-300"
+              }`}
+            >
+              <FiX className="text-[12px]" />
+              Close
             </button>
           </div>
         </div>

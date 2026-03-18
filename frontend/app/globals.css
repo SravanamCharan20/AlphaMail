@@ -257,6 +257,114 @@ h6 {
     /* Progressive enhancement; older browsers will ignore. */
     text-wrap: balance;
   }
+
+  .nav-shell {
+    position: relative;
+  }
+
+  .nav-shell-glow {
+    content: "";
+    position: absolute;
+    left: -12px;
+    right: -12px;
+    top: -14px;
+    height: 70px;
+    border-radius: 999px;
+    background: radial-gradient(
+      circle at 20% 0%,
+      rgba(10, 132, 255, 0.14),
+      rgba(255, 255, 255, 0) 62%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .nav-shell-mask {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      circle at 25% 0%,
+      transparent 0%,
+      rgba(255, 255, 255, 0.96) 65%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .nav-shell::before {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.68) 55%,
+      rgba(255, 255, 255, 0.5) 100%
+    );
+    pointer-events: none;
+  }
+
+  .nav-shell::after {
+    content: "";
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: -1px;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(10, 132, 255, 0.35),
+      transparent
+    );
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  .nav-crest {
+    position: relative;
+    height: 36px;
+    width: 36px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+    display: grid;
+    place-items: center;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+
+  .nav-crest::before {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border-radius: 999px;
+    border: 1px solid rgba(10, 132, 255, 0.35);
+  }
+
+  .nav-crest::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border-radius: 999px;
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(10, 132, 255, 0.25),
+      rgba(10, 132, 255, 0) 70%
+    );
+  }
+
+  .nav-crest-letter {
+    position: relative;
+    z-index: 1;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
 }
 
 @keyframes fadeUp {

@@ -18,6 +18,7 @@ const EmailCards = ({
       ? new Date(now).getTime()
       : 0;
   const normalizedQuery = highlightQuery.trim();
+  const isSearchMode = normalizedQuery.length > 0;
 
   const renderHighlightedText = (text) => {
     if (!normalizedQuery || normalizedQuery.length < 2) {
@@ -80,6 +81,12 @@ const EmailCards = ({
       {msgs.map((mail, index) => {
         const isSelected =
           selectedKey && selectedKey === getThreadKey(mail);
+        const matchPercent =
+          typeof mail.searchScore === "number"
+            ? Math.round(
+                Math.min(Math.max(mail.searchScore, 0), 1) * 100
+              )
+            : null;
         return (
           <button
             key={mail._id || mail.threadId || index}
@@ -92,9 +99,9 @@ const EmailCards = ({
               }
             }}
             className={`group relative cursor-pointer w-full text-left px-3.5 py-3 interactive ${
-              isSelected
-                ? "bg-black/5"
-                : "hover:bg-black/5"
+              isSelected ? "bg-black/5" : "hover:bg-black/5"
+            } ${
+              isSearchMode ? "bg-white/80" : ""
             } border-b border-black/10 last:border-b-0`}
           >
             <div className="flex items-start gap-3">
@@ -117,7 +124,7 @@ const EmailCards = ({
                         : "font-medium text-gray-700"
                     }`}
                   >
-                    {mail.subject || "No subject"}
+                    {renderHighlightedText(mail.subject || "No subject")}
                   </p>
                   <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-gray-500">
                     {mail.isUnread ? (
@@ -133,13 +140,14 @@ const EmailCards = ({
                       New
                     </span>
                   ) : null}
-                  {typeof mail.searchScore === "number" ? (
-                    <span className="rounded-full border border-black/10 bg-white/80 px-2 py-0.5 font-semibold text-[color:var(--ink)]">
-                      Match{" "}
-                      {Math.round(
-                        Math.min(Math.max(mail.searchScore, 0), 1) * 100
-                      )}
-                      %
+                  {isSearchMode && matchPercent !== null ? (
+                    <span className="rounded-full border border-black/10 bg-green-200/80 px-2 py-0.5 font-semibold text-[color:var(--ink)]">
+                      Match {matchPercent}%
+                    </span>
+                  ) : null}
+                  {isSearchMode && mail.account ? (
+                    <span className="rounded-full border border-black/10 bg-white/70 px-2 py-0.5 font-semibold text-[10px] text-gray-600">
+                      {mail.account}
                     </span>
                   ) : null}
                 </div>
@@ -156,10 +164,21 @@ const EmailCards = ({
                   )}
                 </p>
 
-                <div className="mt-2">
-                  <span className="inline-flex items-center rounded-full border border-black/10 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-gray-700">
-                    To: {getToLabel(mail.to) || mail.account || "Recipient"}
-                  </span>
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-[10px]">
+                  {isSearchMode ? (
+                    <>
+                      <span className="inline-flex items-center rounded-full border border-black/10 bg-white/70 px-2 py-0.5 font-semibold text-gray-700">
+                        From: {renderHighlightedText(getFromName(mail.from))}
+                      </span>
+                      <span className="inline-flex items-center rounded-full border border-black/10 bg-white/70 px-2 py-0.5 font-semibold text-gray-700">
+                        To: {getToLabel(mail.to) || "Recipient"}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full border border-black/10 bg-white/70 px-2 py-0.5 text-[10px] font-semibold text-gray-700">
+                      To: {getToLabel(mail.to) || mail.account || "Recipient"}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

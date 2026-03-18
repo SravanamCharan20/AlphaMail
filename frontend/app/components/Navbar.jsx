@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  FiActivity,
   FiCheck,
   FiChevronDown,
   FiLogOut,
@@ -216,17 +215,19 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="relative w-[min(94vw,700px)] rounded-b-[28px] border border-black/10 bg-white/75 shadow-[0_20px_60px_rgba(0,0,0,0.10)] ring-1 ring-white/70 backdrop-blur-xl px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out] detail-noise">
-        <div className="flex items-center justify-between gap-3">
+      <div className="nav-shell relative w-[min(94vw,700px)] overflow-hidden rounded-full top-1 l border border-black/20 bg-white/90 shadow-[0_28px_80px_rgba(15,23,42,0.18)] ring-1 ring-white/80 backdrop-blur-xl px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out] detail-noise">
+        <div className="nav-shell-glow" aria-hidden="true" />
+        <div className="nav-shell-mask" aria-hidden="true" />
+        <div className="relative z-10 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="h-9 w-9 rounded-full border border-black/10 bg-white/80 text-black grid place-items-center shadow-sm interactive"
+            <Link
+              href="/"
+              className="nav-crest interactive"
               aria-label="AlphaMail home"
             >
-              <Link href='/'><FiActivity className="text-[18px]" /></Link>
-            </button>
-            <div className="hidden lg:flex items-center gap-1 rounded-full bg-white/70 p-1 border border-black/10">
+              <span className="nav-crest-letter">A</span>
+            </Link>
+            <div className="hidden lg:flex items-center gap-1 rounded-2xl p-1 border border-black/10">
               {["N", "D", "F"].map((label, idx) => (
                 <button
                   key={label}
@@ -244,14 +245,14 @@ const Navbar = () => {
 
           <div className="hidden md:flex flex-1 items-center justify-center">
             <div
-              className="flex w-[280px] items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[color:var(--muted)] shadow-sm"
+              className="flex w-[300px] items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[color:var(--muted)] shadow-sm"
               title={
                 isSearchDisabled
                   ? "Syncing/embedding in progress. Search will be available after completion."
                   : ""
               }
             >
-              <FiSearch className="text-[16px] text-[color:var(--muted)]" />
+              <FiSearch className="text-[20px] rounded-full border bg-black text-white" />
               <input
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
