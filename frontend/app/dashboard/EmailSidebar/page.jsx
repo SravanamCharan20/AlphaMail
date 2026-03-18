@@ -43,6 +43,12 @@ const EmailSidebar = () => {
   const [searchCount, setSearchCount] = useState(0);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
+  const [embeddingActiveCount, setEmbeddingActiveCount] = useState(0);
+  const [embeddingMeta, setEmbeddingMeta] = useState({
+    totalMessages: 0,
+    account: "",
+    error: null,
+  });
 
   const filtersRef = useRef({ account: "all", range: "all" });
   const lastFiltersRef = useRef({ account: "all", range: "all" });
@@ -57,6 +63,8 @@ const EmailSidebar = () => {
   const pageSize = 5;
   const NEW_TAG_TTL_MS = 2 * 60 * 1000;
   const isSearchActive = searchQuery.trim().length > 0;
+  const isEmbeddingActive = embeddingActiveCount > 0;
+  const showEmbeddingBanner = isEmbeddingActive || syncing;
 
   const updateRefs = () => {
     filtersRef.current = { account: accountFilter, range: dateRange };
@@ -520,6 +528,46 @@ const EmailSidebar = () => {
       setSyncing(true);
     });
 
+    const handleEmbeddingStart = (payload = {}) => {
+      setEmbeddingActiveCount((prev) => prev + 1);
+      setEmbeddingMeta((prev) => ({
+        totalMessages:
+          typeof payload.totalMessages === "number"
+            ? payload.totalMessages
+            : prev.totalMessages,
+        account: payload.account || prev.account,
+        error: null,
+      }));
+    };
+
+    const handleEmbeddingComplete = (payload = {}) => {
+      setEmbeddingActiveCount((prev) => Math.max(prev - 1, 0));
+      setEmbeddingMeta((prev) => ({
+        totalMessages:
+          typeof payload.totalMessages === "number"
+            ? payload.totalMessages
+            : prev.totalMessages,
+        account: payload.account || prev.account,
+        error: null,
+      }));
+    };
+
+    const handleEmbeddingError = (payload = {}) => {
+      setEmbeddingActiveCount((prev) => Math.max(prev - 1, 0));
+      setEmbeddingMeta((prev) => ({
+        totalMessages:
+          typeof payload.totalMessages === "number"
+            ? payload.totalMessages
+            : prev.totalMessages,
+        account: payload.account || prev.account,
+        error: payload.error || "Embedding failed. Try sync again.",
+      }));
+    };
+
+    socket.on("embedding-start", handleEmbeddingStart);
+    socket.on("embedding-complete", handleEmbeddingComplete);
+    socket.on("embedding-error", handleEmbeddingError);
+
     socket.on("email-added", (email) => {
       if (searchQueryRef.current) {
         return;
@@ -591,6 +639,9 @@ const EmailSidebar = () => {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("sync-start");
+      socket.off("embedding-start", handleEmbeddingStart);
+      socket.off("embedding-complete", handleEmbeddingComplete);
+      socket.off("embedding-error", handleEmbeddingError);
       socket.off("email-added");
       socket.off("sync-complete");
       socket.off("email-updated");
@@ -876,6 +927,35 @@ const EmailSidebar = () => {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto pr-1 scrollbar-subtle">
+              {showEmbeddingBanner && (
+                <div className="mb-3 rounded-xl border border-amber-200/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-800">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <FaSpinner className="animate-spin text-amber-500" />
+                    <span>
+                      {isEmbeddingActive
+                        ? "Embedding in progress"
+                        : "Syncing in progress"}
+                    </span>
+                    {embeddingMeta.account && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                        {embeddingMeta.account}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    Search will be available after completion.
+                    {embeddingMeta.totalMessages
+                      ? ` Indexing ${embeddingMeta.totalMessages} messages.`
+                      : ""}
+                  </p>
+                  {embeddingMeta.error && (
+                    <p className="mt-1 text-[11px] text-rose-600">
+                      {embeddingMeta.error}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {isSearchActive && (
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-black/10 bg-white/80 px-3 py-2 text-xs text-[color:var(--muted)]">
                   <div>

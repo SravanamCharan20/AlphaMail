@@ -28,6 +28,24 @@ def embed_texts(texts: List[str]) -> List[List[float]]:
     )
     return vectors.tolist()
 
+def serve():
+    # Warm the model once.
+    get_model()
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+            texts = payload.get("texts", [])
+            if not isinstance(texts, list) or not texts:
+                print(json.dumps({"error": "Expected JSON with 'texts': [..]"}), flush=True)
+                continue
+            vectors = embed_texts(texts)
+            print(json.dumps({"dim": len(vectors[0]) if vectors else 0, "vectors": vectors}), flush=True)
+        except Exception as exc:
+            print(json.dumps({"error": str(exc)}), flush=True)
+
 
 def main():
     if len(sys.argv) >= 3 and sys.argv[1] == "--text":
@@ -37,6 +55,10 @@ def main():
             sys.exit(1)
         vec = embed_texts([text])[0]
         print(json.dumps({"dim": len(vec), "preview": vec[:8]}))
+        return
+
+    if len(sys.argv) >= 2 and sys.argv[1] == "--server":
+        serve()
         return
 
     payload_raw = sys.stdin.read().strip()

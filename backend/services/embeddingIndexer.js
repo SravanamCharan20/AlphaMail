@@ -77,3 +77,100 @@ export const indexGmailMessageEmbeddings = async ({
 
   await EmailEmbedding.insertMany(docs);
 };
+
+export const indexGmailMessagesEmbeddingsBatch = async ({
+  userId,
+  account,
+  entries = [],
+  batchSize = 96,
+}) => {
+  if (!userId || !account || !Array.isArray(entries) || entries.length === 0) {
+    return;
+  }
+
+  const messageIds = entries
+    .map((entry) => entry?.message?.id)
+    .filter(Boolean);
+
+  if (!messageIds.length) return;
+
+  const existing = await EmailEmbedding.find({
+    userId,
+    account,
+    messageId: { $in: messageIds },
+  })
+    .select("messageId")
+    .lean();
+
+  const existingSet = new Set(
+    existing.map((doc) => String(doc.messageId))
+  );
+
+  let batchTexts = [];
+  let batchDocs = [];
+
+  const flushBatch = async () => {
+    if (batchTexts.length === 0) return;
+    const vectors = await embedTexts(batchTexts);
+    if (!vectors.length) {
+      batchTexts = [];
+      batchDocs = [];
+      return;
+    }
+    const docsToInsert = batchDocs.map((doc, idx) => ({
+      ...doc,
+      embedding: vectors[idx],
+      embeddingModel: MODEL_NAME,
+      embeddingDim: MODEL_DIM,
+    }));
+    await EmailEmbedding.insertMany(docsToInsert);
+    batchTexts = [];
+    batchDocs = [];
+  };
+
+  for (const entry of entries) {
+    const message = entry?.message;
+    if (!message?.id) continue;
+    if (existingSet.has(String(message.id))) continue;
+
+    const combinedText = buildEmbeddingTextFromMessage(message);
+    if (!combinedText) continue;
+
+    const chunks = chunkTextByWords(combinedText, {
+      maxWords: 220,
+      overlap: 40,
+    });
+    if (!chunks.length) continue;
+
+    const headers = message.payload?.headers || [];
+    const subject = getHeaderValue(headers, "Subject") || "";
+    const from = getHeaderValue(headers, "From") || "";
+    const receivedAt = message.internalDate
+      ? new Date(Number(message.internalDate))
+      : undefined;
+
+    const labelIds = message.labelIds || [];
+
+    for (const chunk of chunks) {
+      batchTexts.push(chunk.text);
+      batchDocs.push({
+        userId,
+        account,
+        threadId: entry.threadIdOverride || message.threadId,
+        messageId: message.id,
+        chunkIndex: chunk.index,
+        chunkText: chunk.text,
+        receivedAt,
+        subject,
+        from,
+        labels: labelIds,
+      });
+
+      if (batchTexts.length >= batchSize) {
+        await flushBatch();
+      }
+    }
+  }
+
+  await flushBatch();
+};

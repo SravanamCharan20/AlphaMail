@@ -2,7 +2,10 @@ import EmailAccount from "../models/EmailAccount.js";
 import Email from "../models/Email.js";
 import { publishSocketEvent } from "./socketPubSub.js";
 import { createGmailClient } from "./gmailClient.js";
-import { indexGmailMessageEmbeddings } from "./embeddingIndexer.js";
+import {
+  indexGmailMessageEmbeddings,
+  indexGmailMessagesEmbeddingsBatch,
+} from "./embeddingIndexer.js";
 
 const getHeaderValue = (headers, name) =>
   headers.find((header) => header.name === name)?.value;
@@ -90,6 +93,7 @@ export const syncUserEmails = async (userId) => {
 
     for (const account of accounts) {
       const gmail = createGmailClient(account);
+      const embedEntries = [];
 
       const threads = await gmail.users.threads.list({
         userId: "me",
@@ -126,20 +130,55 @@ export const syncUserEmails = async (userId) => {
           isIncremental: false,
         });
 
-        try {
-          await indexGmailMessageEmbeddings({
-            userId,
-            account: account.email,
-            message,
-            threadIdOverride: threadData.data.id,
-          });
-        } catch (err) {
-          console.warn(
-            "[embedding] Initial sync embed failed",
-            err?.message || err
-          );
-        }
+        embedEntries.push({
+          message,
+          threadIdOverride: threadData.data.id,
+        });
       }
+
+      if (embedEntries.length) {
+        await publishSocketEvent(
+          "embedding-start",
+          {
+            account: account.email,
+            totalMessages: embedEntries.length,
+          },
+          userId.toString()
+        );
+      }
+
+      indexGmailMessagesEmbeddingsBatch({
+        userId,
+        account: account.email,
+        entries: embedEntries,
+      })
+        .then(async () => {
+          if (!embedEntries.length) return;
+          await publishSocketEvent(
+            "embedding-complete",
+            {
+              account: account.email,
+              totalMessages: embedEntries.length,
+            },
+            userId.toString()
+          );
+        })
+        .catch(async (err) => {
+        console.warn(
+          "[embedding] Initial sync batch embed failed",
+          err?.message || err
+        );
+        if (!embedEntries.length) return;
+        await publishSocketEvent(
+          "embedding-error",
+          {
+            account: account.email,
+            totalMessages: embedEntries.length,
+            error: err?.message || String(err),
+          },
+          userId.toString()
+        );
+      });
     }
 
     console.log("Email sync completed for user:", userId);
@@ -329,18 +368,16 @@ export const syncIncrementalForAccount = async ({
       upserted: result?.upsertedId ? true : false,
     });
 
-    try {
-      await indexGmailMessageEmbeddings({
-        userId: account.userId,
-        account: account.email,
-        message,
-      });
-    } catch (err) {
+    indexGmailMessageEmbeddings({
+      userId: account.userId,
+      account: account.email,
+      message,
+    }).catch((err) => {
       console.warn(
         "[embedding] Incremental embed failed",
         err?.message || err
       );
-    }
+    });
   }
 
   for (const [threadId, isUnread] of threadReadUpdates.entries()) {

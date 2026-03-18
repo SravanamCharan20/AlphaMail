@@ -5,6 +5,7 @@ import { google } from "googleapis";
 import User from "../models/User.js";
 import EmailAccount from "../models/EmailAccount.js";
 import Email from "../models/Email.js";
+import EmailEmbedding from "../models/EmailEmbedding.js";
 import userAuth from "../middlewares/auth.js";
 import { SCOPES, createOAuth2Client } from "./constants.js";
 import { emailQueue } from "../queues/emailQueue.js";
@@ -183,6 +184,10 @@ googleAuthRouter.delete("/accounts/:accountId", userAuth, async (req, res) => {
 
     await EmailAccount.deleteOne({ _id: accountId, userId: req.user });
     await Email.deleteMany({ userId: req.user, account: account.email });
+    await EmailEmbedding.deleteMany({
+      userId: req.user,
+      account: account.email,
+    });
 
     return res.status(200).json({ message: "Account disconnected" });
   } catch (err) {

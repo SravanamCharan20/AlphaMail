@@ -13,7 +13,8 @@ import {
 } from "react-icons/fi";
 import { useUser } from "../utils/userContext";
 import { API_BASE, apiFetch } from "../utils/api";
-import Link from 'next/link'
+import socket from "../utils/socket";
+import Link from "next/link";
 
 const Navbar = () => {
   const { user, loading } = useUser();
@@ -22,6 +23,11 @@ const Navbar = () => {
   const [accounts, setAccounts] = useState([]);
   const [toast, setToast] = useState(null);
   const [searchValue, setSearchValue] = useState("");
+  const [embeddingActiveCount, setEmbeddingActiveCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  const isEmbeddingActive = embeddingActiveCount > 0;
+  const isSearchDisabled = isEmbeddingActive || syncing;
 
   const initials = useMemo(() => {
     if (!user?.username) return "U";
@@ -148,6 +154,32 @@ const Navbar = () => {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  useEffect(() => {
+    const handleEmbeddingStart = () => {
+      setEmbeddingActiveCount((prev) => prev + 1);
+    };
+    const handleEmbeddingComplete = () => {
+      setEmbeddingActiveCount((prev) => Math.max(prev - 1, 0));
+    };
+    const handleEmbeddingError = () => {
+      setEmbeddingActiveCount((prev) => Math.max(prev - 1, 0));
+    };
+
+    socket.on("embedding-start", handleEmbeddingStart);
+    socket.on("embedding-complete", handleEmbeddingComplete);
+    socket.on("embedding-error", handleEmbeddingError);
+    socket.on("sync-start", () => setSyncing(true));
+    socket.on("sync-complete", () => setSyncing(false));
+
+    return () => {
+      socket.off("embedding-start", handleEmbeddingStart);
+      socket.off("embedding-complete", handleEmbeddingComplete);
+      socket.off("embedding-error", handleEmbeddingError);
+      socket.off("sync-start");
+      socket.off("sync-complete");
+    };
+  }, []);
+
   if (loading && !user) return null;
 
   const quickModeStyles = [
@@ -211,12 +243,23 @@ const Navbar = () => {
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
-            <div className="flex w-[280px] items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[color:var(--muted)] shadow-sm">
+            <div
+              className="flex w-[280px] items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[color:var(--muted)] shadow-sm"
+              title={
+                isSearchDisabled
+                  ? "Syncing/embedding in progress. Search will be available after completion."
+                  : ""
+              }
+            >
               <FiSearch className="text-[16px] text-[color:var(--muted)]" />
               <input
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
                 onKeyDown={(event) => {
+                  if (isSearchDisabled) {
+                    event.preventDefault();
+                    return;
+                  }
                   if (event.key === "Enter") {
                     event.preventDefault();
                     dispatchSearch(searchValue.trim());
@@ -227,7 +270,17 @@ const Navbar = () => {
                   }
                 }}
                 placeholder="Search mail"
-                className="flex-1 bg-transparent text-[12px] text-[color:var(--ink)] outline-none placeholder:text-[color:var(--muted)]"
+                disabled={isSearchDisabled}
+                title={
+                  isSearchDisabled
+                    ? "Syncing/embedding in progress. Search will be available after completion."
+                    : ""
+                }
+                className={`flex-1 bg-transparent text-[12px] outline-none placeholder:text-[color:var(--muted)] ${
+                  isSearchDisabled
+                    ? "cursor-not-allowed text-gray-400"
+                    : "text-[color:var(--ink)]"
+                }`}
               />
               {searchValue ? (
                 <button
@@ -243,7 +296,7 @@ const Navbar = () => {
                 </button>
               ) : (
                 <span className="rounded-full border border-black/10 px-2 py-0.5 text-[10px] text-[color:var(--muted)]">
-                  ↵
+                  {isSearchDisabled ? "…" : "↵"}
                 </span>
               )}
             </div>
