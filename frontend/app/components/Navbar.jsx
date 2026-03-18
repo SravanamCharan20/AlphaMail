@@ -3,7 +3,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FiCheck,
+  FiClock,
+  FiCornerUpLeft,
   FiChevronDown,
+  FiFlag,
   FiLogOut,
   FiMail,
   FiPlus,
@@ -24,6 +27,12 @@ const Navbar = () => {
   const [searchValue, setSearchValue] = useState("");
   const [embeddingActiveCount, setEmbeddingActiveCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState({
+    needsReply: false,
+    deadlines: false,
+    followUps: false,
+  });
 
   const isEmbeddingActive = embeddingActiveCount > 0;
   const isSearchDisabled = isEmbeddingActive || syncing;
@@ -181,12 +190,6 @@ const Navbar = () => {
 
   if (loading && !user) return null;
 
-  const quickModeStyles = [
-    "bg-black text-white shadow-sm",
-    "bg-white text-[color:var(--ink)] border border-black/10 hover:bg-black/5",
-    "bg-white text-[color:var(--muted)] border border-black/10 hover:bg-black/5",
-  ];
-
   return (
     <nav className="fixed top-0 left-1/2 -translate-x-1/2 z-50">
       {toast && (
@@ -215,10 +218,8 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="nav-shell relative w-[min(94vw,700px)] overflow-hidden rounded-full top-1 l border border-black/20 bg-white/90 shadow-[0_28px_80px_rgba(15,23,42,0.18)] ring-1 ring-white/80 backdrop-blur-xl px-3.5 py-2.5 animate-[fadeUp_0.35s_ease-out] detail-noise">
-        <div className="nav-shell-glow" aria-hidden="true" />
-        <div className="nav-shell-mask" aria-hidden="true" />
-        <div className="relative z-10 flex items-center justify-between gap-3">
+      <div className="relative w-[min(92vw,720px)] left-3.5 top-1.5 rounded-full border border-black/10 bg-white/85 shadow-[0_16px_40px_rgba(15,23,42,0.12) backdrop-blur-xl px-4 py-2 animate-[fadeUp_0.35s_ease-out]">
+        <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Link
               href="/"
@@ -227,32 +228,21 @@ const Navbar = () => {
             >
               <span className="nav-crest-letter">A</span>
             </Link>
-            <div className="hidden lg:flex items-center gap-1 rounded-2xl p-1 border border-black/10">
-              {["N", "D", "F"].map((label, idx) => (
-                <button
-                  key={label}
-                  type="button"
-                  className={`h-7 w-7 rounded-lg text-xs font-semibold interactive ${
-                    quickModeStyles[idx] ||
-                    "bg-white text-[color:var(--muted)] border border-black/10"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <span className="hidden sm:inline text-[16px] font-sans font-semibold text-[color:var(--ink)]">
+              ALPHAMAIL
+            </span>
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
             <div
-              className="flex w-[300px] items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[color:var(--muted)] shadow-sm"
+              className="flex p-2 w-[300px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-4 text-[color:var(--muted)] shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
               title={
                 isSearchDisabled
                   ? "Syncing/embedding in progress. Search will be available after completion."
                   : ""
               }
             >
-              <FiSearch className="text-[20px] rounded-full border bg-black text-white" />
+              <div className="border bg-black text-white rounded-full p-1"><FiSearch className="text-[14px] text-white" /></div>
               <input
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
@@ -296,26 +286,102 @@ const Navbar = () => {
                   ✕
                 </button>
               ) : (
-                <span className="rounded-full border border-black/10 px-2 py-0.5 text-[10px] text-[color:var(--muted)]">
+                <span className="kbd">
                   {isSearchDisabled ? "…" : "↵"}
                 </span>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-black/5"
-              aria-label="Filters"
+          <div className="flex items-center border border-slate-500/20 rounded-full p-1 gap-2">
+            <div
+              className="relative"
+              tabIndex={0}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                  setFiltersOpen(false);
+                }
+              }}
             >
-              <span className="hidden sm:inline">Filters</span>
-              <span className="sm:hidden">⋯</span>
-            </button>
+              <button
+                type="button"
+                className="inline-flex cursor-pointer h-8 items-center gap-2 rounded-full border border-black/10 bg-white/90 px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-white"
+                aria-label="Quick filters"
+                aria-haspopup="menu"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((prev) => !prev)}
+              >
+                Quick filters
+              </button>
+
+              <div
+                className={`absolute right-0 top-11 z-50 w-60 origin-top-right rounded-2xl border border-black/10 bg-white/95 p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur transition-all duration-200 ${
+                  filtersOpen
+                    ? "scale-100 opacity-100"
+                    : "pointer-events-none scale-95 opacity-0 -translate-y-1"
+                }`}
+                role="menu"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveFilters((prev) => ({
+                      ...prev,
+                      needsReply: !prev.needsReply,
+                    }))
+                  }
+                  className={`flex w-full items-center cursor-pointer gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                    activeFilters.needsReply
+                      ? "bg-black/5 text-gray-900"
+                      : "text-gray-700 hover:bg-black/5"
+                  }`}
+                  role="menuitem"
+                >
+                  <FiCornerUpLeft className="text-[14px] text-gray-500" />
+                  Needs reply
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveFilters((prev) => ({
+                      ...prev,
+                      deadlines: !prev.deadlines,
+                    }))
+                  }
+                  className={`flex w-full items-center gap-2 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                    activeFilters.deadlines
+                      ? "bg-black/5 text-gray-900"
+                      : "text-gray-700 hover:bg-black/5"
+                  }`}
+                  role="menuitem"
+                >
+                  <FiClock className="text-[14px] text-gray-500" />
+                  Deadlines
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveFilters((prev) => ({
+                      ...prev,
+                      followUps: !prev.followUps,
+                    }))
+                  }
+                  className={`flex w-full items-center gap-2 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                    activeFilters.followUps
+                      ? "bg-black/5 text-gray-900"
+                      : "text-gray-700 hover:bg-black/5"
+                  }`}
+                  role="menuitem"
+                >
+                  <FiFlag className="text-[14px] text-gray-500" />
+                  Follow ups
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full bg-black px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm interactive"
+              className="inline-flex cursor-pointer h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-[#8e81db] to-[#8d39db] text-[11px] font-semibold text-white shadow-[0_12px_24px_rgba(66,133,244,0.25)] interactive"
             >
               AI
             </button>
@@ -333,7 +399,7 @@ const Navbar = () => {
               <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="h-9 w-9 rounded-full cursor-pointer bg-white/80 text-[color:var(--ink)] grid place-items-center text-xs font-semibold ring-1 ring-black/10 interactive hover:bg-black/5"
+                className="h-8 w-8 rounded-full cursor-pointer bg-white/90 text-[color:var(--ink)] grid place-items-center text-xs font-semibold ring-1 ring-black/10 interactive hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={open}
               >
@@ -341,7 +407,7 @@ const Navbar = () => {
               </button>
 
               <div
-                className={`absolute right-0 mt-3 w-64 origin-top-right rounded-2xl border border-black/5 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                className={`absolute right-0 mt-3 z-50 w-64 origin-top-right rounded-2xl border border-black/5 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
                   open
                     ? "scale-100 opacity-100 cursor-pointer translate-y-0"
                     : "pointer-events-none scale-95 opacity-0 -translate-y-1"
@@ -417,7 +483,7 @@ const Navbar = () => {
                               <button
                                 type="button"
                                 onClick={() => handleDisconnectAccount(account)}
-                                className="rounded-full border border-neutral-200 bg-white px-2 py-1 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-100"
+                                className="rounded-full border cursor-pointer border-neutral-200 bg-white px-2 py-1 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-100"
                               >
                                 Disconnect
                               </button>
@@ -450,7 +516,7 @@ const Navbar = () => {
             <button
               type="button"
               onClick={handleConnectMail}
-              className="h-9 w-9 rounded-full bg-[color:var(--accent)] text-white grid place-items-center shadow-[0_12px_30px_rgba(10,132,255,0.24)] interactive"
+              className="h-8 w-8 rounded-full bg-[color:var(--accent)] cursor-pointer text-white grid place-items-center shadow-[0_12px_30px_rgba(10,132,255,0.24)] interactive"
               aria-label="Connect account"
             >
               <FiPlus className="text-[18px]" />
