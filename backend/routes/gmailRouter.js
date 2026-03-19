@@ -159,6 +159,13 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
   const query = { userId };
   const account = req.query.account;
   const range = (req.query.range || "all").toLowerCase();
+  const tagsParam = req.query.tags || req.query.tag;
+  const tags = tagsParam
+    ? String(tagsParam)
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    : [];
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
   const skip = (page - 1) * limit;
@@ -171,6 +178,9 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
   const bounds = getDateRangeBounds(range, tzOffset);
   if (bounds) {
     query.receivedAt = { $gte: bounds.start, $lte: bounds.end };
+  }
+  if (tags.length) {
+    query.tags = { $in: tags };
   }
 
   const [emails, total] = await Promise.all([
@@ -190,6 +200,52 @@ gmailRouter.get("/messages", userAuth, async (req, res) => {
     limit,
     hasNext: page * limit < total,
   });
+});
+
+gmailRouter.get("/tag-counts", userAuth, async (req, res) => {
+  try {
+    const userId = req.user;
+    const account = req.query.account;
+    const range = (req.query.range || "all").toLowerCase();
+    const tzOffset = parseInt(req.query.tzOffset, 10);
+
+    const match = { userId };
+    if (account) {
+      match.account = account;
+    }
+
+    const bounds = getDateRangeBounds(range, tzOffset);
+    if (bounds) {
+      match.receivedAt = { $gte: bounds.start, $lte: bounds.end };
+    }
+
+    const tagKeys = ["needs_reply", "deadline", "follow_up", "spam"];
+
+    const results = await Email.aggregate([
+      { $match: match },
+      { $unwind: "$tags" },
+      { $match: { tags: { $in: tagKeys } } },
+      { $group: { _id: "$tags", count: { $sum: 1 } } },
+    ]);
+
+    const counts = {
+      needs_reply: 0,
+      deadline: 0,
+      follow_up: 0,
+      spam: 0,
+    };
+
+    results.forEach((row) => {
+      if (row?._id) {
+        counts[row._id] = row.count || 0;
+      }
+    });
+
+    return res.json({ counts });
+  } catch (error) {
+    console.error("[gmail] Tag counts failed", error?.message || error);
+    return res.status(500).json({ message: "Failed to load tag counts" });
+  }
 });
 
 gmailRouter.get("/search", userAuth, async (req, res) => {
@@ -283,6 +339,7 @@ gmailRouter.get("/search", userAuth, async (req, res) => {
           subject: 1,
           from: 1,
           labels: 1,
+          tags: 1,
           score: { $meta: "vectorSearchScore" },
         },
       },

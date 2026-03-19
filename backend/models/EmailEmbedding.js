@@ -24,6 +24,9 @@ const emailEmbeddingSchema = new mongoose.Schema(
     subject: String,
     from: String,
     labels: [String],
+    tags: [String],
+    spamCategory: String,
+    deadlineAt: Date,
   },
   { timestamps: true }
 );

@@ -43,6 +43,12 @@ export const matchesFilters = (email, filters) => {
     return false;
   }
 
+  if (Array.isArray(filters.tags) && filters.tags.length > 0) {
+    const emailTags = Array.isArray(email?.tags) ? email.tags : [];
+    const hasTag = filters.tags.some((tag) => emailTags.includes(tag));
+    if (!hasTag) return false;
+  }
+
   if (filters.range === "all") return true;
 
   const candidate = email?.receivedAt || email?.date;

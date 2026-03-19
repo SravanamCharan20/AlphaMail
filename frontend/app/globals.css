@@ -260,7 +260,6 @@ h6 {
 
   .nav-shell {
     position: relative;
-    background: rgba(255, 255, 255, 0.85);
   }
 
   .nav-shell::before {
@@ -270,9 +269,8 @@ h6 {
     border-radius: inherit;
     background: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.9) 0%,
-      rgba(255, 255, 255, 0.6) 50%,
-      rgba(255, 255, 255, 0.4) 100%
+      rgba(255, 255, 255, 0.75) 0%,
+      rgba(255, 255, 255, 0.3) 100%
     );
     pointer-events: none;
   }

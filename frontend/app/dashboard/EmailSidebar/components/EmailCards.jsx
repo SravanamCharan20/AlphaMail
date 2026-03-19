@@ -76,6 +76,20 @@ const EmailCards = ({
     return value.split(",")[0].trim();
   };
 
+  const tagLabels = {
+    needs_reply: "Needs reply",
+    deadline: "Deadline",
+    follow_up: "Follow up",
+    spam: "Spam",
+  };
+
+  const tagStyles = {
+    needs_reply: "bg-blue-100 text-blue-700 border-blue-100",
+    deadline: "bg-amber-100 text-amber-700 border-amber-100",
+    follow_up: "bg-purple-100 text-purple-700 border-purple-100",
+    spam: "bg-gray-100 text-gray-600 border-gray-200",
+  };
+
   return (
     <div className="overflow-hidden cursor-pointer rounded-2xl border border-black/10 bg-white/70 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur detail-noise">
       {msgs.map((mail, index) => {
@@ -87,6 +101,10 @@ const EmailCards = ({
                 Math.min(Math.max(mail.searchScore, 0), 1) * 100
               )
             : null;
+        const rawTags = Array.isArray(mail.tags) ? mail.tags : [];
+        const displayTags = rawTags.filter((tag) => tagLabels[tag]);
+        const tagsToShow = displayTags.slice(0, 2);
+        const extraCount = displayTags.length - tagsToShow.length;
         return (
           <button
             key={mail._id || mail.threadId || index}
@@ -148,6 +166,19 @@ const EmailCards = ({
                   {isSearchMode && mail.account ? (
                     <span className="rounded-full border border-black/10 bg-white/70 px-2 py-0.5 font-semibold text-[10px] text-gray-600">
                       {mail.account}
+                    </span>
+                  ) : null}
+                  {tagsToShow.map((tag) => (
+                    <span
+                      key={`${mail._id}-${tag}`}
+                      className={`rounded-full border px-2 py-0.5 font-semibold ${tagStyles[tag]}`}
+                    >
+                      {tagLabels[tag]}
+                    </span>
+                  ))}
+                  {extraCount > 0 ? (
+                    <span className="rounded-full border border-black/10 bg-white/70 px-2 py-0.5 font-semibold text-gray-600">
+                      +{extraCount}
                     </span>
                   ) : null}
                 </div>

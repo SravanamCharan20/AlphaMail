@@ -50,6 +50,13 @@ const EmailSidebar = () => {
   const [searchCount, setSearchCount] = useState(0);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
+  const [quickTags, setQuickTags] = useState([]);
+  const [tagCounts, setTagCounts] = useState({
+    needs_reply: 0,
+    deadline: 0,
+    follow_up: 0,
+    spam: 0,
+  });
   const [embeddingActiveCount, setEmbeddingActiveCount] = useState(0);
   const [embeddingMeta, setEmbeddingMeta] = useState({
     totalMessages: 0,
@@ -57,8 +64,8 @@ const EmailSidebar = () => {
     error: null,
   });
 
-  const filtersRef = useRef({ account: "all", range: "all" });
-  const lastFiltersRef = useRef({ account: "all", range: "all" });
+  const filtersRef = useRef({ account: "all", range: "all", tags: [] });
+  const lastFiltersRef = useRef({ account: "all", range: "all", tags: [] });
   const pageRef = useRef(1);
   const fetchSeqRef = useRef(0);
   const fetchAbortRef = useRef(null);
@@ -74,11 +81,15 @@ const EmailSidebar = () => {
   const showEmbeddingBanner = isEmbeddingActive || syncing;
 
   const updateRefs = () => {
-    filtersRef.current = { account: accountFilter, range: dateRange };
+    filtersRef.current = {
+      account: accountFilter,
+      range: dateRange,
+      tags: quickTags,
+    };
     pageRef.current = page;
   };
 
-  useEffect(updateRefs, [accountFilter, dateRange, page]);
+  useEffect(updateRefs, [accountFilter, dateRange, quickTags, page]);
 
   useEffect(() => {
     selectedThreadRef.current = selectedThread;
@@ -127,6 +138,20 @@ const EmailSidebar = () => {
   }, []);
 
   useEffect(() => {
+    const handleQuickFilters = (event) => {
+      const tags = Array.isArray(event?.detail?.tags)
+        ? event.detail.tags
+        : [];
+      setQuickTags(tags);
+      setPage(1);
+    };
+
+    window.addEventListener("quick-filters", handleQuickFilters);
+    return () =>
+      window.removeEventListener("quick-filters", handleQuickFilters);
+  }, []);
+
+  useEffect(() => {
     if (!searchQuery) return;
     fetchSearchResults(searchQuery);
   }, [searchQuery, accountFilter, dateRange]);
@@ -139,6 +164,9 @@ const EmailSidebar = () => {
     }
     if (range !== "all") {
       params.set("range", range);
+    }
+    if (quickTags.length) {
+      params.set("tags", quickTags.join(","));
     }
 
     params.set("page", String(pageNumber));
@@ -199,6 +227,7 @@ const EmailSidebar = () => {
         snippet: item.chunkText,
         searchSnippet: item.chunkText,
         searchScore: item.score,
+        tags: Array.isArray(item.tags) ? item.tags : [],
         isUnread: false,
       }));
 
@@ -230,6 +259,35 @@ const EmailSidebar = () => {
       );
     } catch (error) {
       console.warn("Failed to load preferences", error);
+    }
+  };
+
+  const fetchTagCounts = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (accountFilter !== "all") {
+        params.set("account", accountFilter);
+      }
+      if (dateRange !== "all") {
+        params.set("range", dateRange);
+      }
+      params.set("tzOffset", String(tzOffset));
+
+      const res = await apiFetch(`/gmail/tag-counts?${params.toString()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const counts = data?.counts || {};
+      setTagCounts({
+        needs_reply: counts.needs_reply || 0,
+        deadline: counts.deadline || 0,
+        follow_up: counts.follow_up || 0,
+        spam: counts.spam || 0,
+      });
+      window.dispatchEvent(
+        new CustomEvent("quick-filter-counts", { detail: { counts } })
+      );
+    } catch (error) {
+      console.warn("Failed to load tag counts", error);
     }
   };
 
@@ -436,6 +494,7 @@ const EmailSidebar = () => {
   useEffect(() => {
     fetchAccounts();
     fetchPreferences();
+    fetchTagCounts();
   }, []);
 
   useEffect(() => {
@@ -446,6 +505,7 @@ const EmailSidebar = () => {
   useEffect(() => {
     const handleAccountsUpdate = () => {
       fetchAccounts();
+      fetchTagCounts();
       if (searchQueryRef.current) {
         fetchSearchResults(searchQueryRef.current);
         return;
@@ -466,10 +526,16 @@ const EmailSidebar = () => {
     const lastFilters = lastFiltersRef.current;
     const filtersChanged =
       lastFilters.account !== accountFilter ||
-      lastFilters.range !== dateRange;
+      lastFilters.range !== dateRange ||
+      JSON.stringify(lastFilters.tags || []) !==
+        JSON.stringify(quickTags || []);
 
     if (filtersChanged) {
-      lastFiltersRef.current = { account: accountFilter, range: dateRange };
+      lastFiltersRef.current = {
+        account: accountFilter,
+        range: dateRange,
+        tags: quickTags,
+      };
       if (page !== 1) {
         setPage(1);
         return;
@@ -481,11 +547,12 @@ const EmailSidebar = () => {
     }
 
     fetchMessages();
-  }, [accountFilter, dateRange, page, pageSize, searchQuery]);
+    fetchTagCounts();
+  }, [accountFilter, dateRange, quickTags, page, pageSize, searchQuery]);
 
   useEffect(() => {
     setNewMailCount(0);
-  }, [accountFilter, dateRange]);
+  }, [accountFilter, dateRange, quickTags]);
 
   useEffect(() => {
     setSelectedThread(null);
@@ -631,6 +698,7 @@ const EmailSidebar = () => {
       if (pageRef.current === 1) {
         fetchMessages({ resetNew: true });
       }
+      fetchTagCounts();
     });
 
     socket.on("email-updated", (update) => {

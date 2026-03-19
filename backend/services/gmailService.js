@@ -6,6 +6,7 @@ import {
   indexGmailMessageEmbeddings,
   indexGmailMessagesEmbeddingsBatch,
 } from "./embeddingIndexer.js";
+import { classifyEmail } from "./emailClassifier.js";
 
 const getHeaderValue = (headers, name) =>
   headers.find((header) => header.name === name)?.value;
@@ -17,6 +18,7 @@ const buildEmailPayloadFromMessage = (message, threadIdOverride) => {
   const labelIds = message.labelIds || [];
   const subject = getHeaderValue(headers, "Subject");
   const from = getHeaderValue(headers, "From");
+  const to = getHeaderValue(headers, "To");
   const date = getHeaderValue(headers, "Date");
   const internalDateMs = Number(message.internalDate);
   const receivedAt = Number.isFinite(internalDateMs)
@@ -25,15 +27,30 @@ const buildEmailPayloadFromMessage = (message, threadIdOverride) => {
     ? new Date(date)
     : null;
 
+  const classification = classifyEmail({
+    subject,
+    from,
+    to,
+    snippet: message.snippet,
+    headers,
+    labelIds,
+    receivedAt,
+  });
+
   return {
     messageId: message.id,
     threadId: threadIdOverride || message.threadId,
     subject,
     from,
+    to,
     date,
     receivedAt,
     snippet: message.snippet,
     isUnread: labelIds.includes("UNREAD"),
+    labels: labelIds,
+    tags: classification.tags,
+    spamCategory: classification.spamCategory,
+    deadlineAt: classification.deadlineAt,
   };
 };
 
@@ -53,11 +70,16 @@ const upsertEmailAndPublish = async ({
       threadId: emailPayload.threadId,
       subject: emailPayload.subject,
       from: emailPayload.from,
+      to: emailPayload.to,
       date: emailPayload.date,
       receivedAt: emailPayload.receivedAt,
       snippet: emailPayload.snippet,
       messageId: emailPayload.messageId,
       isUnread: emailPayload.isUnread,
+      labels: emailPayload.labels || [],
+      tags: emailPayload.tags || [],
+      spamCategory: emailPayload.spamCategory || null,
+      deadlineAt: emailPayload.deadlineAt || null,
       userId,
       syncSource,
       lastSyncedAt: new Date(),
@@ -72,11 +94,16 @@ const upsertEmailAndPublish = async ({
       threadId: emailPayload.threadId,
       subject: emailPayload.subject,
       from: emailPayload.from,
+      to: emailPayload.to,
       date: emailPayload.date,
       receivedAt: emailPayload.receivedAt,
       snippet: emailPayload.snippet,
       messageId: emailPayload.messageId,
       isUnread: emailPayload.isUnread,
+      labels: emailPayload.labels || [],
+      tags: emailPayload.tags || [],
+      spamCategory: emailPayload.spamCategory || null,
+      deadlineAt: emailPayload.deadlineAt || null,
       isIncremental,
     },
     userId.toString()
@@ -133,6 +160,9 @@ export const syncUserEmails = async (userId) => {
         embedEntries.push({
           message,
           threadIdOverride: threadData.data.id,
+          tags: emailPayload?.tags || [],
+          spamCategory: emailPayload?.spamCategory || null,
+          deadlineAt: emailPayload?.deadlineAt || null,
         });
       }
 
@@ -372,6 +402,9 @@ export const syncIncrementalForAccount = async ({
       userId: account.userId,
       account: account.email,
       message,
+      tags: emailPayload?.tags || [],
+      spamCategory: emailPayload?.spamCategory || null,
+      deadlineAt: emailPayload?.deadlineAt || null,
     }).catch((err) => {
       console.warn(
         "[embedding] Incremental embed failed",

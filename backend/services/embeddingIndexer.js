@@ -28,6 +28,9 @@ export const indexGmailMessageEmbeddings = async ({
   account,
   message,
   threadIdOverride,
+  tags = [],
+  spamCategory = null,
+  deadlineAt = null,
 }) => {
   if (!message?.id || !userId || !account) return;
 
@@ -73,6 +76,9 @@ export const indexGmailMessageEmbeddings = async ({
     subject,
     from,
     labels: labelIds,
+    tags,
+    spamCategory,
+    deadlineAt,
   }));
 
   await EmailEmbedding.insertMany(docs);
@@ -164,6 +170,9 @@ export const indexGmailMessagesEmbeddingsBatch = async ({
         subject,
         from,
         labels: labelIds,
+        tags: Array.isArray(entry.tags) ? entry.tags : [],
+        spamCategory: entry.spamCategory || null,
+        deadlineAt: entry.deadlineAt || null,
       });
 
       if (batchTexts.length >= batchSize) {

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  FiAlertTriangle,
   FiCheck,
   FiClock,
   FiCornerUpLeft,
@@ -12,7 +13,6 @@ import {
   FiPlus,
   FiSearch,
   FiUser,
-  FiActivity,
 } from "react-icons/fi";
 import { useUser } from "../utils/userContext";
 import { API_BASE, apiFetch } from "../utils/api";
@@ -33,10 +33,32 @@ const Navbar = () => {
     needsReply: false,
     deadlines: false,
     followUps: false,
+    spam: false,
+  });
+  const [tagCounts, setTagCounts] = useState({
+    needs_reply: 0,
+    deadline: 0,
+    follow_up: 0,
+    spam: 0,
   });
 
   const isEmbeddingActive = embeddingActiveCount > 0;
   const isSearchDisabled = isEmbeddingActive || syncing;
+  const filtersRef = useRef(null);
+  const profileRef = useRef(null);
+
+  const emitQuickFilters = (next) => {
+    const tags = [];
+    if (next.needsReply) tags.push("needs_reply");
+    if (next.deadlines) tags.push("deadline");
+    if (next.followUps) tags.push("follow_up");
+    if (next.spam) tags.push("spam");
+    window.queueMicrotask(() => {
+      window.dispatchEvent(
+        new CustomEvent("quick-filters", { detail: { tags } })
+      );
+    });
+  };
 
   const initials = useMemo(() => {
     if (!user?.username) return "U";
@@ -189,6 +211,44 @@ const Navbar = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        filtersOpen &&
+        filtersRef.current &&
+        !filtersRef.current.contains(event.target)
+      ) {
+        setFiltersOpen(false);
+      }
+      if (
+        open &&
+        profileRef.current &&
+        !profileRef.current.contains(event.target)
+      ) {
+        setOpen(false);
+        setAccountsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [filtersOpen, open]);
+
+  useEffect(() => {
+    const handleCounts = (event) => {
+      const counts = event?.detail?.counts || {};
+      setTagCounts((prev) => ({
+        ...prev,
+        ...counts,
+      }));
+    };
+    window.addEventListener("quick-filter-counts", handleCounts);
+    return () =>
+      window.removeEventListener("quick-filter-counts", handleCounts);
+  }, []);
+
   if (loading && !user) return null;
 
   return (
@@ -219,7 +279,7 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="relative w-[min(92vw,720px)] left-3.5 top-2 rounded-full border border-black/10 bg-white/85 shadow-[0_16px_40px_rgba(15,23,42,0.12) backdrop-blur-xl px-4 py-2 animate-[fadeUp_0.35s_ease-out]">
+      <div className="relative w-[min(92vw,720px)] rounded-full border border-black/10 left-4 bg-white/85 backdrop-blur-xl px-4 py-1 animate-[fadeUp_0.35s_ease-out]">
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Link
@@ -227,23 +287,25 @@ const Navbar = () => {
               className="nav-crest interactive"
               aria-label="AlphaMail home"
             >
-              <span className="text-md"><FiActivity/></span>
+              <span className="nav-crest-letter">A</span>
             </Link>
-            <span className="hidden sm:inline text-[16px] font-sans font-semibold text-[color:var(--ink)]">
-              Alpha<span className="text-blue-500/90">Mail</span>
+            <span className="hidden sm:inline text-[12px] font-semibold text-[color:var(--ink)]">
+              AlphaMail
             </span>
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
             <div
-              className="flex p-2 w-[300px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-2.5"
+              className="flex h-9 w-[370px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[color:var(--muted)] shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
               title={
                 isSearchDisabled
                   ? "Syncing/embedding in progress. Search will be available after completion."
                   : ""
               }
             >
-              <div className="border bg-black text-white rounded-full p-1"><FiSearch className="text-[14px] text-white" /></div>
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[color:var(--accent)]">
+                <FiSearch className="text-[13px]" />
+              </span>
               <input
                 value={searchValue}
                 onChange={(event) => setSearchValue(event.target.value)}
@@ -294,19 +356,11 @@ const Navbar = () => {
             </div>
           </div>
 
-          <div className="flex items-center border border-slate-800/20 rounded-full p-1 gap-2.5">
-            <div
-              className="relative"
-              tabIndex={0}
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget)) {
-                  setFiltersOpen(false);
-                }
-              }}
-            >
+          <div className="flex items-center gap-2 rounded-full border  border-black/10 bg-white/80 px-3 py-1">
+            <div className="relative" ref={filtersRef}>
               <button
                 type="button"
-                className="inline-flex cursor-pointer h-8 items-center gap-2 rounded-full border border-black/10 bg-white/90 px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-white"
+                className="inline-flex p-1 items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-white"
                 aria-label="Quick filters"
                 aria-haspopup="menu"
                 aria-expanded={filtersOpen}
@@ -326,10 +380,14 @@ const Navbar = () => {
                 <button
                   type="button"
                   onClick={() =>
-                    setActiveFilters((prev) => ({
-                      ...prev,
-                      needsReply: !prev.needsReply,
-                    }))
+                    setActiveFilters((prev) => {
+                      const next = {
+                        ...prev,
+                        needsReply: !prev.needsReply,
+                      };
+                      emitQuickFilters(next);
+                      return next;
+                    })
                   }
                   className={`flex w-full items-center cursor-pointer gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
                     activeFilters.needsReply
@@ -339,15 +397,22 @@ const Navbar = () => {
                   role="menuitem"
                 >
                   <FiCornerUpLeft className="text-[14px] text-gray-500" />
-                  Needs reply
+                  <span className="flex-1">Needs reply</span>
+                  <span className="text-[10px] text-gray-400">
+                    {tagCounts.needs_reply || 0}
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() =>
-                    setActiveFilters((prev) => ({
-                      ...prev,
-                      deadlines: !prev.deadlines,
-                    }))
+                    setActiveFilters((prev) => {
+                      const next = {
+                        ...prev,
+                        deadlines: !prev.deadlines,
+                      };
+                      emitQuickFilters(next);
+                      return next;
+                    })
                   }
                   className={`flex w-full items-center gap-2 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
                     activeFilters.deadlines
@@ -357,15 +422,22 @@ const Navbar = () => {
                   role="menuitem"
                 >
                   <FiClock className="text-[14px] text-gray-500" />
-                  Deadlines
+                  <span className="flex-1">Deadlines</span>
+                  <span className="text-[10px] text-gray-400">
+                    {tagCounts.deadline || 0}
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() =>
-                    setActiveFilters((prev) => ({
-                      ...prev,
-                      followUps: !prev.followUps,
-                    }))
+                    setActiveFilters((prev) => {
+                      const next = {
+                        ...prev,
+                        followUps: !prev.followUps,
+                      };
+                      emitQuickFilters(next);
+                      return next;
+                    })
                   }
                   className={`flex w-full items-center gap-2 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
                     activeFilters.followUps
@@ -375,32 +447,51 @@ const Navbar = () => {
                   role="menuitem"
                 >
                   <FiFlag className="text-[14px] text-gray-500" />
-                  Follow ups
+                  <span className="flex-1">Follow ups</span>
+                  <span className="text-[10px] text-gray-400">
+                    {tagCounts.follow_up || 0}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveFilters((prev) => {
+                      const next = {
+                        ...prev,
+                        spam: !prev.spam,
+                      };
+                      emitQuickFilters(next);
+                      return next;
+                    })
+                  }
+                  className={`flex w-full items-center gap-2 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                    activeFilters.spam
+                      ? "bg-black/5 text-gray-900"
+                      : "text-gray-700 hover:bg-black/5"
+                  }`}
+                  role="menuitem"
+                >
+                  <FiAlertTriangle className="text-[14px] text-gray-500" />
+                  <span className="flex-1">Spam & promos</span>
+                  <span className="text-[10px] text-gray-400">
+                    {tagCounts.spam || 0}
+                  </span>
                 </button>
               </div>
             </div>
 
             <button
               type="button"
-              className="inline-flex cursor-pointer h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-[#8e81db] to-[#8d39db] text-[11px] font-semibold text-white interactive"
+              className="inline-flex p-2 items-center justify-center rounded-full bg-black text-[11px] font-semibold text-white interactive"
             >
               AI
             </button>
 
-            <div
-              className="relative"
-              tabIndex={0}
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget)) {
-                  setOpen(false);
-                  setAccountsOpen(false);
-                }
-              }}
-            >
+            <div className="relative" ref={profileRef}>
               <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
-                className="h-8 w-8 rounded-full cursor-pointer bg-white/90 text-[color:var(--ink)] grid place-items-center text-xs font-semibold ring-1 ring-black/10 interactive hover:bg-black/5"
+                className="h-8 w-8 rounded-full cursor-pointer bg-white/95 text-[color:var(--ink)] grid place-items-center text-xs font-semibold ring-1 ring-black/10 interactive hover:bg-black/5"
                 aria-haspopup="menu"
                 aria-expanded={open}
               >
@@ -517,7 +608,7 @@ const Navbar = () => {
             <button
               type="button"
               onClick={handleConnectMail}
-              className="h-8 w-8 rounded-full bg-[color:var(--accent)] cursor-pointer text-white grid place-items-center interactive"
+              className="h-8 w-8 rounded-full bg-[color:var(--accent)] cursor-pointer text-white grid place-items-center shadow-[0_10px_20px_rgba(10,132,255,0.22)] interactive"
               aria-label="Connect account"
             >
               <FiPlus className="text-[18px]" />
