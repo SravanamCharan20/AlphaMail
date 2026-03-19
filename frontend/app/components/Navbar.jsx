@@ -279,7 +279,7 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="relative w-[min(92vw,720px)] rounded-full border border-black/10 left-4 bg-white/85 backdrop-blur-xl px-4 py-1 animate-[fadeUp_0.35s_ease-out]">
+      <div className="relative w-[min(92vw,720px)] top-2 rounded-full border border-black/10 left-4 bg-white/85 backdrop-blur-xl px-4 py-1 animate-[fadeUp_0.35s_ease-out]">
         <div className="relative z-10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Link
@@ -289,14 +289,14 @@ const Navbar = () => {
             >
               <span className="nav-crest-letter">A</span>
             </Link>
-            <span className="hidden sm:inline text-[12px] font-semibold text-[color:var(--ink)]">
-              AlphaMail
+            <span className="hidden sm:inline text-[18px] font-semibold text-[color:var(--ink)]">
+              Alpha<span className="text-blue-600/90">Mail</span>
             </span>
           </div>
 
           <div className="hidden md:flex flex-1 items-center justify-center">
             <div
-              className="flex h-9 w-[370px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[color:var(--muted)] shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
+              className="flex h-10.5 w-[340px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[color:var(--muted)] shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
               title={
                 isSearchDisabled
                   ? "Syncing/embedding in progress. Search will be available after completion."
@@ -360,7 +360,7 @@ const Navbar = () => {
             <div className="relative" ref={filtersRef}>
               <button
                 type="button"
-                className="inline-flex p-1 items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-white"
+                className="inline-flex  items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-white"
                 aria-label="Quick filters"
                 aria-haspopup="menu"
                 aria-expanded={filtersOpen}
