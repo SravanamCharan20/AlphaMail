@@ -574,6 +574,7 @@ const EmailSidebar = () => {
       subject: mail.subject,
       from: mail.from,
       isUnread: mail.isUnread,
+      tags: Array.isArray(mail.tags) ? mail.tags : [],
     };
     setSelectedThread(nextThread);
   };
@@ -586,6 +587,58 @@ const EmailSidebar = () => {
   const handleUntrustSender = async (sender) => {
     if (!sender) return;
     await updatePreferences({ removeTrustedSender: sender });
+  };
+
+  const applyTagsToState = (threadId, account, tags) => {
+    setSelectedThread((prev) =>
+      prev && prev.threadId === threadId && prev.account === account
+        ? { ...prev, tags }
+        : prev
+    );
+
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.threadId === threadId && msg.account === account
+          ? { ...msg, tags }
+          : msg
+      )
+    );
+
+    setSearchResults((prev) =>
+      prev.map((msg) =>
+        msg.threadId === threadId && msg.account === account
+          ? { ...msg, tags }
+          : msg
+      )
+    );
+  };
+
+  const submitTagFeedback = async (tags) => {
+    const thread = selectedThreadRef.current;
+    if (!thread?.threadId || !thread?.account) return false;
+    try {
+      const res = await apiFetch("/gmail/tag-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: thread.threadId,
+          account: thread.account,
+          tags,
+          applySimilarity: true,
+        }),
+      });
+
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (Array.isArray(data.tags)) {
+        applyTagsToState(thread.threadId, thread.account, data.tags);
+        fetchTagCounts();
+      }
+      return true;
+    } catch (error) {
+      console.warn("Failed to save tag feedback", error);
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -1267,6 +1320,8 @@ const EmailSidebar = () => {
           onUntrustSender={handleUntrustSender}
           readingMode={readingMode}
           showDetails={showDetails}
+          onUpdateTags={submitTagFeedback}
+          onSendTagFeedback={submitTagFeedback}
         />
       </div>
     </div>

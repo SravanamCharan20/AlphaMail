@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import Email from "../models/Email.js";
-import { classifyEmail } from "../services/emailClassifier.js";
+import { classifyEmail } from "../services/classification/index.js";
 
 dotenv.config();
 

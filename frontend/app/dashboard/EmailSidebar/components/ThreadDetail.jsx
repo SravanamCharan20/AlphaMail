@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const formatDateTime = (value) => {
   if (!value) return "";
@@ -309,6 +309,8 @@ const ThreadDetail = ({
   onUntrustSender,
   readingMode = "clean",
   showDetails = false,
+  onUpdateTags,
+  onSendTagFeedback,
 }) => {
   const trustedSet = useMemo(() => {
     return new Set(
@@ -329,6 +331,27 @@ const ThreadDetail = ({
   const [showImages, setShowImages] = useState(initialShowImages);
   const [expandedQuotes, setExpandedQuotes] = useState({});
   const [frameHeights, setFrameHeights] = useState({});
+  const [tagFeedback, setTagFeedback] = useState(null);
+  const [tagMenuOpen, setTagMenuOpen] = useState(false);
+  const [pendingTags, setPendingTags] = useState([]);
+  const [savingTags, setSavingTags] = useState(false);
+  const [tagError, setTagError] = useState(null);
+  const [tagMenuPos, setTagMenuPos] = useState(null);
+  const tagButtonRef = useRef(null);
+  const tagMenuRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (!tagFeedback) return;
+    const timer = window.setTimeout(() => setTagFeedback(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [tagFeedback]);
+
+  useEffect(() => {
+    setTagMenuOpen(false);
+    setTagError(null);
+    setTagMenuPos(null);
+  }, [thread?.threadId, thread?.account]);
 
   const threadMeta = useMemo(() => {
     const allAttachments = [];
@@ -424,6 +447,101 @@ const ThreadDetail = ({
     ? trustedSet.has(trustedKey) || trustedSet.has(senderEmail)
     : false;
 
+  const tagLabels = {
+    needs_reply: "Needs reply",
+    deadline: "Deadline",
+    follow_up: "Follow up",
+    spam: "Spam",
+  };
+
+  const tagStyles = {
+    needs_reply: "bg-blue-100 text-blue-700 border-blue-100",
+    deadline: "bg-amber-100 text-amber-700 border-amber-100",
+    follow_up: "bg-purple-100 text-purple-700 border-purple-100",
+    spam: "bg-gray-100 text-gray-600 border-gray-200",
+  };
+
+  const threadTags = Array.isArray(thread?.tags) ? thread.tags : [];
+  const displayTags = threadTags.filter((tag) => tagLabels[tag]);
+  const tagKey = displayTags.join("|");
+
+  useEffect(() => {
+    setPendingTags(displayTags);
+  }, [tagKey, thread?.threadId]);
+
+  const togglePendingTag = (tag) => {
+    setPendingTags((prev) => {
+      if (prev.includes(tag)) {
+        return prev.filter((item) => item !== tag);
+      }
+      return [...prev, tag];
+    });
+  };
+
+  const handleSaveTags = async () => {
+    if (!onUpdateTags) return;
+    setSavingTags(true);
+    setTagError(null);
+    const ok = await onUpdateTags(pendingTags);
+    if (ok) {
+      setTagFeedback("saved");
+      setTagMenuOpen(false);
+    } else {
+      setTagError("Could not save tags. Try again.");
+    }
+    setSavingTags(false);
+  };
+
+  const tagOptions = [
+    { key: "needs_reply", label: "Needs reply" },
+    { key: "deadline", label: "Deadline" },
+    { key: "follow_up", label: "Follow up" },
+    { key: "spam", label: "Spam" },
+  ];
+
+  const openTagMenu = () => {
+    const rect = tagButtonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setTagMenuPos({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+        width: rect.width,
+      });
+    } else {
+      setTagMenuPos({ top: 140, right: 32, width: 140 });
+    }
+    setTagMenuOpen(true);
+  };
+
+  useEffect(() => {
+    if (!tagMenuOpen) return;
+    const handleScroll = () => setTagMenuOpen(false);
+    const handleResize = () => setTagMenuOpen(false);
+    const container = scrollContainerRef.current;
+    container?.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      container?.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [tagMenuOpen]);
+
+  useEffect(() => {
+    if (!tagMenuOpen) return;
+    const handleClickOutside = (event) => {
+      if (
+        tagMenuRef.current?.contains(event.target) ||
+        tagButtonRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+      setTagMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [tagMenuOpen]);
+
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
@@ -433,7 +551,10 @@ const ThreadDetail = ({
             : "grid-cols-1"
         }`}
       >
-        <div className="min-h-0 overflow-y-auto rounded-[26px] border border-black/10 bg-white/70 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur detail-noise surface-inset scrollbar-subtle">
+        <div
+          ref={scrollContainerRef}
+          className="min-h-0 overflow-y-auto rounded-[26px] border border-black/10 bg-white/70 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur detail-noise surface-inset scrollbar-subtle"
+        >
           <div className="-mx-5 -mt-5 mb-4 border-b border-black/10 bg-white/80 px-5 py-4 backdrop-blur surface-inset">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
@@ -448,6 +569,14 @@ const ThreadDetail = ({
                   <h2 className="font-display text-[1.05rem] font-semibold tracking-tight text-gray-900 truncate">
                     {title}
                   </h2>
+                  {displayTags.map((tag) => (
+                    <span
+                      key={`thread-tag-${tag}`}
+                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${tagStyles[tag]}`}
+                    >
+                      {tagLabels[tag]}
+                    </span>
+                  ))}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                   <span className="truncate">{subtitle}</span>
@@ -460,6 +589,62 @@ const ThreadDetail = ({
                   <span className="text-gray-300">•</span>
                   <span>{messages?.length || 0} messages</span>
                 </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                  <span>
+                    {displayTags.length
+                      ? "Auto-tagged from message signals."
+                      : "No tags yet. Add a tag to teach AlphaMail."}
+                  </span>
+                  {displayTags.length ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!onSendTagFeedback) {
+                            setTagFeedback("helpful");
+                            return;
+                          }
+                          const ok = await onSendTagFeedback(displayTags);
+                          setTagFeedback(ok ? "helpful" : "error");
+                        }}
+                        className="rounded-full border border-black/10 bg-white/80 px-2.5 py-0.5 text-[10px] font-semibold text-gray-700 hover:bg-white"
+                      >
+                        Looks right
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTagFeedback(null);
+                          openTagMenu();
+                        }}
+                        className="rounded-full border border-black/10 bg-white/80 px-2.5 py-0.5 text-[10px] font-semibold text-gray-700 hover:bg-white"
+                      >
+                        Not right
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openTagMenu}
+                      className="rounded-full border border-black/10 bg-white/80 px-2.5 py-0.5 text-[10px] font-semibold text-gray-700 hover:bg-white"
+                    >
+                      Add tags
+                    </button>
+                  )}
+                  {tagFeedback ? (
+                    <span
+                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${
+                        tagFeedback === "error"
+                          ? "border-rose-100 bg-rose-50 text-rose-600"
+                          : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      {tagFeedback === "error"
+                        ? "Could not save feedback"
+                        : "Thanks for the feedback"}
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-[11px] font-semibold text-[color:var(--ink)]">
@@ -470,6 +655,18 @@ const ThreadDetail = ({
                     Images trusted
                   </span>
                 ) : null}
+                <div className="relative">
+                  <button
+                    type="button"
+                    ref={tagButtonRef}
+                    onClick={() =>
+                      tagMenuOpen ? setTagMenuOpen(false) : openTagMenu()
+                    }
+                    className="rounded-full border border-black/10 bg-white/80 px-3 py-1 text-[11px] font-semibold text-gray-700 hover:bg-white"
+                  >
+                    {displayTags.length ? "Edit tags" : "Add tags"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -853,6 +1050,61 @@ const ThreadDetail = ({
           </aside>
         ) : null}
       </div>
+      {tagMenuOpen && tagMenuPos ? (
+        <div
+          ref={tagMenuRef}
+          className="fixed z-[999] rounded-xl border border-black/10 bg-white p-3 text-[11px] shadow-[0_20px_50px_rgba(0,0,0,0.12)]"
+          style={{
+            top: tagMenuPos.top,
+            right: tagMenuPos.right,
+            minWidth: Math.max(tagMenuPos.width || 160, 160),
+          }}
+        >
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+            Tag this thread
+          </p>
+          <div className="space-y-2">
+            {tagOptions.map((option) => (
+              <label
+                key={option.key}
+                className="flex items-center gap-2 text-[11px] text-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={pendingTags.includes(option.key)}
+                  onChange={() => togglePendingTag(option.key)}
+                  className="h-3.5 w-3.5 rounded border-gray-300 text-[color:var(--accent)] focus:ring-[color:var(--accent)]"
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+          {tagError ? (
+            <p className="mt-2 text-[10px] text-rose-500">{tagError}</p>
+          ) : null}
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setTagMenuOpen(false);
+                setPendingTags(displayTags);
+                setTagError(null);
+              }}
+              className="rounded-full border border-black/10 px-2.5 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveTags}
+              disabled={savingTags}
+              className="rounded-full bg-black px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-black/90 disabled:opacity-60"
+            >
+              {savingTags ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

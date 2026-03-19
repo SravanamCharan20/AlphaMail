@@ -6,7 +6,8 @@ import {
   indexGmailMessageEmbeddings,
   indexGmailMessagesEmbeddingsBatch,
 } from "./embeddingIndexer.js";
-import { classifyEmail } from "./emailClassifier.js";
+import { classifyEmail } from "./classification/index.js";
+import { applyTagRules } from "./tagRulesService.js";
 
 const getHeaderValue = (headers, name) =>
   headers.find((header) => header.name === name)?.value;
@@ -63,6 +64,14 @@ const upsertEmailAndPublish = async ({
 }) => {
   if (!emailPayload?.threadId) return null;
 
+  const mergedTags = await applyTagRules({
+    userId,
+    from: emailPayload.from,
+    subject: emailPayload.subject,
+    tags: emailPayload.tags || [],
+  });
+  emailPayload.tags = mergedTags;
+
   const result = await Email.updateOne(
     { userId, account: accountEmail, threadId: emailPayload.threadId },
     {
@@ -77,7 +86,7 @@ const upsertEmailAndPublish = async ({
       messageId: emailPayload.messageId,
       isUnread: emailPayload.isUnread,
       labels: emailPayload.labels || [],
-      tags: emailPayload.tags || [],
+      tags: mergedTags,
       spamCategory: emailPayload.spamCategory || null,
       deadlineAt: emailPayload.deadlineAt || null,
       userId,
@@ -101,7 +110,7 @@ const upsertEmailAndPublish = async ({
       messageId: emailPayload.messageId,
       isUnread: emailPayload.isUnread,
       labels: emailPayload.labels || [],
-      tags: emailPayload.tags || [],
+      tags: mergedTags,
       spamCategory: emailPayload.spamCategory || null,
       deadlineAt: emailPayload.deadlineAt || null,
       isIncremental,

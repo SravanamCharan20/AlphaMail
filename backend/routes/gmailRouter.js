@@ -19,6 +19,7 @@ import {
 } from "../services/emailContent.js";
 import { embedTexts } from "../services/embeddingService.js";
 import { normalizeText } from "../services/textChunker.js";
+import { upsertTagRules } from "../services/tagRulesService.js";
 
 const gmailRouter = express.Router();
 
@@ -576,6 +577,131 @@ gmailRouter.patch("/threads/:threadId/read", userAuth, async (req, res) => {
   } catch (error) {
     console.error("[gmail] Update read state failed", error?.message || error);
     res.status(500).json({ message: "Failed to update read state" });
+  }
+});
+
+gmailRouter.post("/tag-feedback", userAuth, async (req, res) => {
+  try {
+    const userId = req.user;
+    const { threadId, account, tags, applySimilarity } = req.body || {};
+
+    if (!threadId) {
+      return res.status(400).json({ message: "threadId is required." });
+    }
+
+    const allowedTags = new Set([
+      "needs_reply",
+      "deadline",
+      "follow_up",
+      "spam",
+    ]);
+    const hasTagsParam = Array.isArray(tags);
+    const nextTags = hasTagsParam
+      ? tags.filter((tag) => allowedTags.has(tag))
+      : [];
+
+    const email = await Email.findOne({
+      userId,
+      threadId,
+      ...(account ? { account } : {}),
+    });
+
+    if (!email) {
+      return res.status(404).json({ message: "Thread not found." });
+    }
+
+    if (hasTagsParam) {
+      await Email.updateOne(
+        { _id: email._id },
+        {
+          $set: {
+            tags: nextTags,
+            spamCategory: nextTags.includes("spam")
+              ? email.spamCategory || "manual"
+              : email.spamCategory,
+          },
+        }
+      );
+    }
+
+    if (nextTags.length) {
+      await upsertTagRules({
+        userId,
+        from: email.from,
+        subject: email.subject,
+        tags: nextTags,
+        sourceThreadId: email.threadId,
+        sourceAccount: email.account,
+      });
+    }
+
+    let similarityTagged = 0;
+    if (applySimilarity && nextTags.length) {
+      const seedEmbedding = await EmailEmbedding.findOne({
+        userId,
+        account: email.account,
+        threadId: email.threadId,
+        embedding: { $exists: true },
+      }).lean();
+
+      if (seedEmbedding?.embedding?.length) {
+        const similar = await EmailEmbedding.aggregate([
+          {
+            $vectorSearch: {
+              index: "email_embeddings_vector",
+              path: "embedding",
+              queryVector: seedEmbedding.embedding,
+              numCandidates: 200,
+              limit: 50,
+              filter: {
+                userId: email.userId,
+                account: email.account,
+              },
+            },
+          },
+          {
+            $project: {
+              threadId: 1,
+              score: { $meta: "vectorSearchScore" },
+            },
+          },
+        ]);
+
+        const matchedThreadIds = similar
+          .filter((item) => item.score >= 0.86 && item.threadId)
+          .map((item) => item.threadId);
+
+        if (matchedThreadIds.length) {
+          const emailResult = await Email.updateMany(
+            {
+              userId,
+              account: email.account,
+              threadId: { $in: matchedThreadIds },
+            },
+            { $addToSet: { tags: { $each: nextTags } } }
+          );
+          similarityTagged = emailResult.modifiedCount || 0;
+
+          await EmailEmbedding.updateMany(
+            {
+              userId,
+              account: email.account,
+              threadId: { $in: matchedThreadIds },
+            },
+            { $addToSet: { tags: { $each: nextTags } } }
+          );
+        }
+      }
+    }
+
+    return res.json({
+      ok: true,
+      tags: nextTags,
+      similarityTagged,
+    });
+  } catch (error) {
+    console.error("[tag-feedback] failed", error);
+    return res.status(500).json({ message: "Failed to save tag feedback." });
   }
 });
 
