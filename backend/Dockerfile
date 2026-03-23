@@ -1,6 +1,7 @@
 FROM node:20-bookworm-slim
 
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
 ENV PATH="/opt/venv/bin:${PATH}"
 
@@ -19,7 +20,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY workers/requirements-embeddings.txt ./workers/requirements-embeddings.txt
-RUN pip install --retries 10 --timeout 120 -r workers/requirements-embeddings.txt
+RUN pip install --no-compile --retries 10 --timeout 120 -r workers/requirements-embeddings.txt \
+  && find /opt/venv -type d -name "__pycache__" -prune -exec rm -rf {} +
 
 COPY . .
 
