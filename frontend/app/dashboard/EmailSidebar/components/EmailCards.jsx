@@ -4,6 +4,33 @@ import { getThreadKey } from "../emailUtils";
 const escapeRegex = (value) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const EMAIL_ADDRESS_REGEX =
+  /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/;
+
+const stripSurroundingQuotes = (value) =>
+  String(value || "").trim().replace(/^['"]+|['"]+$/g, "");
+
+const getPrimaryRecipient = (value) => {
+  if (!value) return "";
+
+  let recipient = "";
+  let insideQuotes = false;
+
+  for (const char of String(value)) {
+    if (char === '"') {
+      insideQuotes = !insideQuotes;
+    }
+
+    if (char === "," && !insideQuotes) {
+      break;
+    }
+
+    recipient += char;
+  }
+
+  return recipient.trim();
+};
+
 const EmailCards = ({
   msgs,
   selectedKey,
@@ -60,7 +87,7 @@ const EmailCards = ({
   const getFromName = (value) => {
     if (!value) return "Unknown sender";
     const match = value.match(/^(.*?)(<|$)/);
-    const name = match?.[1]?.trim();
+    const name = stripSurroundingQuotes(match?.[1]);
     return name || value;
   };
 
@@ -72,8 +99,15 @@ const EmailCards = ({
   };
 
   const getToLabel = (value) => {
-    if (!value) return "";
-    return value.split(",")[0].trim();
+    const primaryRecipient = getPrimaryRecipient(value);
+    if (!primaryRecipient) return "";
+
+    const nameMatch = primaryRecipient.match(/^(.*?)\s*<[^>]+>$/);
+    const name = stripSurroundingQuotes(nameMatch?.[1]);
+    if (name) return name;
+
+    const email = primaryRecipient.match(EMAIL_ADDRESS_REGEX)?.[1];
+    return email || stripSurroundingQuotes(primaryRecipient);
   };
 
   const tagLabels = {
@@ -84,9 +118,9 @@ const EmailCards = ({
   };
 
   const tagStyles = {
-    needs_reply: "bg-blue-100 text-blue-700 border-blue-100",
-    deadline: "bg-amber-100 text-amber-700 border-amber-100",
-    follow_up: "bg-purple-100 text-purple-700 border-purple-100",
+    needs_reply: "bg-blue-100 text-blue-700 border-blue-200",
+    deadline: "bg-amber-100 text-amber-700 border-amber-200",
+    follow_up: "bg-purple-100 text-purple-700 border-purple-200",
     spam: "bg-red-100 text-red-700 border-red-200",
   };
 
@@ -154,7 +188,7 @@ const EmailCards = ({
 
                 <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
                   {mail.newUntil && nowTs > 0 && nowTs < mail.newUntil ? (
-                    <span className="rounded-full border border-black/10 bg-white/80 px-2 py-0.5 font-semibold text-[color:var(--ink)]">
+                    <span className="rounded-full border border-green-300 bg-green-300/40 px-2 py-0.5 font-semibold text-green-800">
                       New
                     </span>
                   ) : null}

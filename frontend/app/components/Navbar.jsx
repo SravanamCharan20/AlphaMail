@@ -12,6 +12,7 @@ import {
   FiMail,
   FiPlus,
   FiSearch,
+  FiSliders,
   FiUser,
 } from "react-icons/fi";
 import { useUser } from "../utils/userContext";
@@ -69,6 +70,11 @@ const Navbar = () => {
       .map((part) => part[0].toUpperCase())
       .join("");
   }, [user]);
+
+  const activeFilterCount = useMemo(
+    () => Object.values(activeFilters).filter(Boolean).length,
+    [activeFilters]
+  );
 
   const handleLogout = async () => {
     try {
@@ -279,9 +285,9 @@ const Navbar = () => {
         </div>
       )}
 
-      <div className="relative w-[min(92vw,720px)] top-2 rounded-full border border-black/10 left-4 bg-white/85 backdrop-blur-xl px-4 py-1 animate-[fadeUp_0.35s_ease-out]">
-        <div className="relative z-10 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+      <div className="relative top-2 w-[min(90vw,740px)] left-5.5 rounded-[28px] border border-black/10 bg-white/82 px-2.5 py-0.5 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur-xl animate-[fadeUp_0.35s_ease-out]">
+        <div className="relative z-10 flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <Link
               href="/"
               className="nav-crest interactive"
@@ -289,22 +295,22 @@ const Navbar = () => {
             >
               <span className="nav-crest-letter">A</span>
             </Link>
-            <span className="hidden sm:inline text-[18px] font-semibold text-[color:var(--ink)]">
+            <span className="hidden sm:inline text-[17px] font-semibold text-[color:var(--ink)]">
               Alpha<span className="text-blue-600/90">Mail</span>
             </span>
           </div>
 
-          <div className="hidden md:flex flex-1 items-center justify-center">
+          <div className="hidden min-w-0 md:flex flex-1 items-center justify-center">
             <div
-              className="flex h-10.5 w-[340px] items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[color:var(--muted)] shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
+              className="flex h-10 w-full max-w-[390px] items-center gap-2 rounded-[22px] border border-black/10 bg-white/95 px-3 text-[color:var(--muted)] shadow-[0_8px_20px_rgba(15,23,42,0.08)]"
               title={
                 isSearchDisabled
                   ? "Syncing/embedding in progress. Search will be available after completion."
                   : ""
               }
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[color:var(--accent)]">
-                <FiSearch className="text-[13px]" />
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[color:var(--accent)]">
+                <FiSearch className="text-[12px]" />
               </span>
               <input
                 value={searchValue}
@@ -343,7 +349,7 @@ const Navbar = () => {
                     setSearchValue("");
                     dispatchSearch("");
                   }}
-                  className="text-[11px] text-[color:var(--muted)] hover:text-[color:var(--ink)]"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/5 text-[10px] text-[color:var(--muted)] transition hover:bg-black/10 hover:text-[color:var(--ink)]"
                   aria-label="Clear search"
                 >
                   ✕
@@ -356,17 +362,46 @@ const Navbar = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border  border-black/10 bg-white/80 px-3 py-1">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 p-1">
             <div className="relative" ref={filtersRef}>
               <button
                 type="button"
-                className="inline-flex  items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3 text-[11px] font-semibold text-[color:var(--ink)] shadow-sm interactive hover:bg-white"
+                className={`inline-flex h-9 items-center gap-2 rounded-[16px] border px-3 text-[11px] font-semibold shadow-sm interactive ${
+                  filtersOpen || activeFilterCount > 0
+                    ? "border-black/5 bg-[color:var(--ink)] text-white shadow-[0_18px_36px_rgba(15,23,42,0.16)]"
+                    : "border-black/10 bg-white/95 text-[color:var(--ink)] hover:bg-white"
+                }`}
                 aria-label="Quick filters"
                 aria-haspopup="menu"
                 aria-expanded={filtersOpen}
                 onClick={() => setFiltersOpen((prev) => !prev)}
               >
-                Quick filters
+                <span
+                  className={`grid h-6 w-6 place-items-center rounded-full ${
+                    filtersOpen || activeFilterCount > 0
+                      ? "bg-white/14 text-white"
+                      : "bg-[var(--accent-soft)] text-[color:var(--accent)]"
+                  }`}
+                >
+                  <FiSliders className="text-[12px]" />
+                </span>
+                <span className="hidden xl:inline">Quick filters</span>
+                {activeFilterCount > 0 ? (
+                  <span
+                    className={`inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                      filtersOpen
+                        ? "bg-white text-[color:var(--ink)]"
+                        : "bg-white/14 text-white"
+                    }`}
+                  >
+                    {activeFilterCount}
+                  </span>
+                ) : null}
+                <FiChevronDown
+                  className={`text-[13px] transition ${
+                    filtersOpen ? "rotate-180" : ""
+                  }`}
+                />
               </button>
 
               <div
@@ -482,137 +517,142 @@ const Navbar = () => {
 
             <button
               type="button"
-              className="inline-flex p-2 items-center justify-center rounded-full bg-black text-[11px] font-semibold text-white interactive"
+              className="inline-flex h-9 items-center gap-2 rounded-[16px] border border-black/5 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.2),transparent_58%),linear-gradient(135deg,#0b0b0f,#1f2937)] px-3 text-[10px] font-semibold tracking-[0.16em] text-white shadow-[0_16px_28px_rgba(15,23,42,0.18)] interactive"
             >
+              <span className="h-2 w-2 rounded-full bg-[color:var(--accent)] shadow-[0_0_0_4px_rgba(10,132,255,0.14)]" />
               AI
             </button>
 
-            <div className="relative" ref={profileRef}>
-              <button
-                type="button"
-                onClick={() => setOpen((prev) => !prev)}
-                className="h-8 w-8 rounded-full cursor-pointer bg-white/95 text-[color:var(--ink)] grid place-items-center text-xs font-semibold ring-1 ring-black/10 interactive hover:bg-black/5"
-                aria-haspopup="menu"
-                aria-expanded={open}
-              >
-                {initials}
-              </button>
+            <div className="flex items-center gap-1 rounded-[16px] border border-black/10 bg-white/92 p-1 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
+              <div className="relative" ref={profileRef}>
+                <button
+                  type="button"
+                  onClick={() => setOpen((prev) => !prev)}
+                  className="grid h-8 w-8 place-items-center rounded-[12px] bg-white text-xs font-semibold text-[color:var(--ink)] ring-1 ring-black/10 interactive hover:bg-black/5"
+                  aria-haspopup="menu"
+                  aria-expanded={open}
+                >
+                  {initials}
+                </button>
 
-              <div
-                className={`absolute right-0 mt-3 z-50 w-64 origin-top-right rounded-2xl border border-black/5 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
-                  open
-                    ? "scale-100 opacity-100 cursor-pointer translate-y-0"
-                    : "pointer-events-none scale-95 opacity-0 -translate-y-1"
-                }`}
-              >
-                <div className="px-4 pt-4 pb-3 border-b border-neutral-100">
-                  <p className="text-sm font-semibold text-neutral-800">
-                    {user?.username ?? "Profile"}
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {user?.email ?? "you@alphamail.com"}
-                  </p>
-                </div>
-                <div className="p-2">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2 text-left text-sm font-medium text-neutral-900"
-                  >
-                    <span className="h-8 w-8 rounded-lg bg-white shadow-sm grid place-items-center text-neutral-700">
-                      <FiUser className="text-[16px]" />
-                    </span>
-                    Profile
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAccountsOpen((prev) => !prev)}
-                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-                    aria-expanded={accountsOpen}
-                  >
-                    <span className="h-8 w-8 rounded-lg bg-neutral-100 grid place-items-center text-neutral-700">
-                      <FiMail className="text-[16px]" />
-                    </span>
-                    <span className="flex-1">Accounts</span>
-                    <FiChevronDown
-                      className={`text-[14px] text-neutral-400 transition-transform ${
-                        accountsOpen ? "rotate-180" : ""
+                <div
+                  className={`absolute right-0 mt-3 z-50 w-64 origin-top-right rounded-2xl border border-black/5 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)] transition-all duration-200 ${
+                    open
+                      ? "scale-100 opacity-100 cursor-pointer translate-y-0"
+                      : "pointer-events-none scale-95 opacity-0 -translate-y-1"
+                  }`}
+                >
+                  <div className="px-4 pt-4 pb-3 border-b border-neutral-100">
+                    <p className="text-sm font-semibold text-neutral-800">
+                      {user?.username ?? "Profile"}
+                    </p>
+                    <p className="text-xs text-neutral-500">
+                      {user?.email ?? "you@alphamail.com"}
+                    </p>
+                  </div>
+                  <div className="p-2">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 rounded-xl bg-neutral-100 px-3 py-2 text-left text-sm font-medium text-neutral-900"
+                    >
+                      <span className="h-8 w-8 rounded-lg bg-white shadow-sm grid place-items-center text-neutral-700">
+                        <FiUser className="text-[16px]" />
+                      </span>
+                      Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAccountsOpen((prev) => !prev)}
+                      className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                      aria-expanded={accountsOpen}
+                    >
+                      <span className="h-8 w-8 rounded-lg bg-neutral-100 grid place-items-center text-neutral-700">
+                        <FiMail className="text-[16px]" />
+                      </span>
+                      <span className="flex-1">Accounts</span>
+                      <FiChevronDown
+                        className={`text-[14px] text-neutral-400 transition-transform ${
+                          accountsOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    <div
+                      className={`grid transition-all duration-200 ${
+                        accountsOpen
+                          ? "grid-rows-[1fr] opacity-100"
+                          : "grid-rows-[0fr] opacity-0"
                       }`}
-                    />
-                  </button>
-                  <div
-                    className={`grid transition-all duration-200 ${
-                      accountsOpen
-                        ? "grid-rows-[1fr] opacity-100"
-                        : "grid-rows-[0fr] opacity-0"
-                    }`}
-                  >
-                    <div className="overflow-hidden">
-                      <div className="px-3 pb-2 pt-2 space-y-2 max-h-48 overflow-auto pr-1">
-                        {accounts.length > 0 ? (
-                          accounts.map((account) => (
-                            <div
-                              key={
-                                account._id ||
-                                `${account.provider}-${account.email}`
-                              }
-                              className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2"
-                            >
-                              <div className="h-8 w-8 rounded-lg bg-[var(--accent-soft)] text-[color:var(--accent)] grid place-items-center text-xs font-semibold">
-                                {(account.provider || "G")
-                                  .toUpperCase()
-                                  .slice(0, 1)}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-semibold text-neutral-800 truncate">
-                                  {account.provider === "gmail"
-                                    ? "Gmail"
-                                    : account.provider}
-                                </p>
-                                <p className="text-[11px] text-neutral-500 truncate">
-                                  {account.email}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleDisconnectAccount(account)}
-                                className="rounded-full border cursor-pointer border-neutral-200 bg-white px-2 py-1 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-100"
+                    >
+                      <div className="overflow-hidden">
+                        <div className="px-3 pb-2 pt-2 space-y-2 max-h-48 overflow-auto pr-1">
+                          {accounts.length > 0 ? (
+                            accounts.map((account) => (
+                              <div
+                                key={
+                                  account._id ||
+                                  `${account.provider}-${account.email}`
+                                }
+                                className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-2"
                               >
-                                Disconnect
-                              </button>
+                                <div className="h-8 w-8 rounded-lg bg-[var(--accent-soft)] text-[color:var(--accent)] grid place-items-center text-xs font-semibold">
+                                  {(account.provider || "G")
+                                    .toUpperCase()
+                                    .slice(0, 1)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold text-neutral-800 truncate">
+                                    {account.provider === "gmail"
+                                      ? "Gmail"
+                                      : account.provider}
+                                  </p>
+                                  <p className="text-[11px] text-neutral-500 truncate">
+                                    {account.email}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDisconnectAccount(account)}
+                                  className="rounded-full border cursor-pointer border-neutral-200 bg-white px-2 py-1 text-[10px] font-semibold text-neutral-600 hover:bg-neutral-100"
+                                >
+                                  Disconnect
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-xs text-neutral-500">
+                              No accounts connected yet.
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-xs text-neutral-500">
-                            No accounts connected yet.
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <div className="border-t border-neutral-100 p-2">
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                  >
-                    <span className="h-8 w-8 rounded-lg bg-red-50 grid place-items-center text-red-600">
-                      <FiLogOut className="text-[16px]" />
-                    </span>
-                    Sign out
-                  </button>
+                  <div className="border-t border-neutral-100 p-2">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                    >
+                      <span className="h-8 w-8 rounded-lg bg-red-50 grid place-items-center text-red-600">
+                        <FiLogOut className="text-[16px]" />
+                      </span>
+                      Sign out
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={handleConnectMail}
-              className="h-8 w-8 rounded-full bg-[color:var(--accent)] cursor-pointer text-white grid place-items-center shadow-[0_10px_20px_rgba(10,132,255,0.22)] interactive"
-              aria-label="Connect account"
-            >
-              <FiPlus className="text-[18px]" />
-            </button>
+              <span className="h-5 w-px bg-black/10" />
+
+              <button
+                type="button"
+                onClick={handleConnectMail}
+                className="grid h-8 w-8 place-items-center rounded-[12px] bg-[color:var(--accent)] text-white shadow-[0_10px_18px_rgba(10,132,255,0.22)] interactive"
+                aria-label="Connect account"
+              >
+                <FiPlus className="text-[16px]" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

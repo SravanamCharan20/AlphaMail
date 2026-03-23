@@ -1257,22 +1257,7 @@ const EmailSidebar = () => {
               Raw
             </button>
             <span className="mx-1 h-4 w-px bg-black/10" />
-            <button
-              type="button"
-              onClick={() =>
-                selectedThread?.isUnread
-                  ? updateReadState(selectedThread, false)
-                  : updateReadState(selectedThread, true)
-              }
-              disabled={!selectedThread}
-              className={`rounded-full cursor-pointer px-2 py-0.5 transition ${
-                selectedThread
-                  ? "text-gray-700 hover:bg-black/5"
-                  : "cursor-not-allowed text-gray-300"
-              }`}
-            >
-              {selectedThread?.isUnread ? "Read" : "Unread"}
-            </button>
+            
             <button
               type="button"
               onClick={() => setShowDetails((prev) => !prev)}
