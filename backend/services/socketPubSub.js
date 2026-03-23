@@ -1,19 +1,13 @@
-import IORedis from "ioredis";
+import { createRedisConnection } from "../config/redis.js";
 
 const CHANNEL = "socket-events";
 
 let publisher;
 let subscriber;
 
-const getRedisOptions = () => ({
-  host: process.env.REDIS_HOST || "127.0.0.1",
-  port: Number(process.env.REDIS_PORT || 6379),
-  maxRetriesPerRequest: null,
-});
-
 const getPublisher = () => {
   if (!publisher) {
-    publisher = new IORedis(getRedisOptions());
+    publisher = createRedisConnection();
   }
   return publisher;
 };
@@ -25,7 +19,7 @@ export const publishSocketEvent = async (event, payload, room) => {
 
 export const initSocketSubscriber = (io) => {
   if (subscriber) return;
-  subscriber = new IORedis(getRedisOptions());
+  subscriber = createRedisConnection();
 
   subscriber.subscribe(CHANNEL, (err) => {
     if (err) {

@@ -10,6 +10,7 @@ import userAuth from "../middlewares/auth.js";
 import { SCOPES, createOAuth2Client } from "./constants.js";
 import { emailQueue } from "../queues/emailQueue.js";
 import { watchMailboxForAccount } from "../services/gmailService.js";
+import { buildClientUrl } from "../config/app.js";
 dotenv.config();
 
 const googleAuthRouter = express.Router();
@@ -121,9 +122,9 @@ googleAuthRouter.get("/google/callback", async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    const successUrl = `http://localhost:3000/oauth/success?provider=gmail&email=${encodeURIComponent(
-      gmailAddress
-    )}`;
+    const successUrl = buildClientUrl(
+      `/oauth/success?provider=gmail&email=${encodeURIComponent(gmailAddress)}`
+    );
     res.redirect(successUrl);
 
     setImmediate(async () => {

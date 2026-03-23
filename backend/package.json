@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "worker:start": "node workers/emailWorker.js",
+    "worker:dev": "nodemon workers/emailWorker.js",
     "preload:embeddings": "python3 workers/preload_embeddings.py"
   },
   "keywords": [],

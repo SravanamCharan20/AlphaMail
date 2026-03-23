@@ -1,17 +1,13 @@
 import { Worker } from "bullmq";
-import IORedis from "ioredis";
 import {
   syncIncrementalForAccount,
   syncUserEmails,
 } from "../services/gmailService.js";
 import { connectDB } from "../config/db.js";
 import { publishSocketEvent } from "../services/socketPubSub.js";
+import { createRedisConnection } from "../config/redis.js";
 
-const redisConnection = new IORedis({
-  host: "127.0.0.1",
-  port: 6379,
-  maxRetriesPerRequest: null,
-});
+const redisConnection = createRedisConnection();
 
 await connectDB();
 console.log("Worker Started...");

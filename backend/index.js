@@ -10,6 +10,7 @@ import gmailRouter from "./routes/gmailRouter.js";
 import http from 'http';
 import { initSocket } from "./config/socketServer.js";
 import { initSocketSubscriber } from "./services/socketPubSub.js";
+import { isAllowedOrigin } from "./config/app.js";
 
 // CONSTANTS
 const app = express();
@@ -22,23 +23,12 @@ initSocketSubscriber(io);
 // Middlewares
 app.use(cookieParser());
 app.use(express.json());
-const isProd = process.env.NODE_ENV === "production";
-const allowedOrigin = process.env.CLIENT_ORIGIN || "http://localhost:3000";
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (origin === allowedOrigin) return callback(null, true);
-      if (!isProd) {
-        if (
-          origin.startsWith("http://localhost:") ||
-          origin.startsWith("http://127.0.0.1:")
-        ) {
-          return callback(null, true);
-        }
-      }
-      return callback(new Error("Not allowed by CORS"));
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      return callback(new Error(`Not allowed by CORS: ${origin || "unknown"}`));
     },
     credentials: true,
   })
