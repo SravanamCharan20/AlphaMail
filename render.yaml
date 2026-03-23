@@ -1,0 +1,118 @@
+services:
+  - type: keyvalue
+    name: alphamail-redis
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: alphamail-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: MONGO_URL
+        sync: false
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: alphamail-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: alphamail-redis
+          property: port
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: PUBSUB_TOPIC
+        sync: false
+      - key: PUBSUB_PUSH_SERVICE_ACCOUNT
+        sync: false
+      - key: PUBSUB_PUSH_AUDIENCE
+        sync: false
+      - key: PUBSUB_LABELS
+        value: INBOX
+
+  - type: worker
+    name: alphamail-worker
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: npm run worker:start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_ORIGIN
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: CLIENT_ORIGIN
+      - key: MONGO_URL
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: MONGO_URL
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: alphamail-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: alphamail-redis
+          property: port
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: JWT_SECRET
+      - key: GOOGLE_CLIENT_ID
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: GOOGLE_CLIENT_ID
+      - key: GOOGLE_CLIENT_SECRET
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: GOOGLE_CLIENT_SECRET
+      - key: GOOGLE_REDIRECT_URI
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: GOOGLE_REDIRECT_URI
+      - key: PUBSUB_TOPIC
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: PUBSUB_TOPIC
+      - key: PUBSUB_PUSH_SERVICE_ACCOUNT
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: PUBSUB_PUSH_SERVICE_ACCOUNT
+      - key: PUBSUB_PUSH_AUDIENCE
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: PUBSUB_PUSH_AUDIENCE
+      - key: PUBSUB_LABELS
+        fromService:
+          type: web
+          name: alphamail-backend
+          envVarKey: PUBSUB_LABELS
