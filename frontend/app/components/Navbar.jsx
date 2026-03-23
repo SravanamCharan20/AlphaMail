@@ -515,14 +515,6 @@ const Navbar = () => {
               </div>
             </div>
 
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-[16px] border border-black/5 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.2),transparent_58%),linear-gradient(135deg,#0b0b0f,#1f2937)] px-3 text-[10px] font-semibold tracking-[0.16em] text-white shadow-[0_16px_28px_rgba(15,23,42,0.18)] interactive"
-            >
-              <span className="h-2 w-2 rounded-full bg-[color:var(--accent)] shadow-[0_0_0_4px_rgba(10,132,255,0.14)]" />
-              AI
-            </button>
-
             <div className="flex items-center gap-1 rounded-[16px] border border-black/10 bg-white/92 p-1 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
               <div className="relative" ref={profileRef}>
                 <button
