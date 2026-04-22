@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 dotenv.config();
 
 const userAuthRouter = express.Router();
+const isProd = process.env.NODE_ENV === "production";
 
 userAuthRouter.post("/signup", async (req, res) => {
   try {
@@ -71,8 +72,8 @@ userAuthRouter.post("/signin", async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false, // true in production
-      sameSite: "strict",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -94,7 +95,11 @@ userAuthRouter.post("/signin", async (req, res) => {
 });
 
 userAuthRouter.post("/logout", (req, res) => {
-  res.clearCookie("token");
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+  });
 
   res.status(200).json({
     message: "Logged out successfully",

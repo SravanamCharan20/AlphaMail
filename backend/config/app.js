@@ -2,21 +2,31 @@ import "dotenv/config";
 
 const DEFAULT_CLIENT_ORIGIN = "http://localhost:3000";
 
-export const getClientOrigin = () =>
-  process.env.CLIENT_ORIGIN?.trim() || DEFAULT_CLIENT_ORIGIN;
+const normalizeOrigin = (value = "") => value.trim().replace(/\/+$/, "");
+
+const getConfiguredOrigins = () => {
+  const rawOrigins = process.env.CLIENT_ORIGIN?.trim() || DEFAULT_CLIENT_ORIGIN;
+  return rawOrigins
+    .split(",")
+    .map((origin) => normalizeOrigin(origin))
+    .filter(Boolean);
+};
+
+export const getClientOrigin = () => getConfiguredOrigins()[0] || DEFAULT_CLIENT_ORIGIN;
 
 export const isAllowedOrigin = (origin) => {
   if (!origin) return true;
 
   const isProd = process.env.NODE_ENV === "production";
-  const allowedOrigin = getClientOrigin();
+  const normalizedOrigin = normalizeOrigin(origin);
+  const allowedOrigins = getConfiguredOrigins();
 
-  if (origin === allowedOrigin) return true;
+  if (allowedOrigins.includes(normalizedOrigin)) return true;
 
   if (!isProd) {
     return (
-      origin.startsWith("http://localhost:") ||
-      origin.startsWith("http://127.0.0.1:")
+      normalizedOrigin.startsWith("http://localhost:") ||
+      normalizedOrigin.startsWith("http://127.0.0.1:")
     );
   }
 

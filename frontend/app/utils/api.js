@@ -1,5 +1,5 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9000";
+const RAW_API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:9000";
+export const API_BASE = RAW_API_BASE.replace(/\/+$/, "");
 
 let warnedOffline = false;
 
