@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import React, { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import React, { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useUser } from "../../utils/userContext";
 import { apiFetch } from "../../utils/api";
@@ -42,10 +42,16 @@ const SigninContent = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirectPath, setRedirectPath] = useState("/dashboard");
 
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useUser();
+  const safeNext = useMemo(() => {
+    const nextPath = searchParams.get("next");
+    return nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+      ? nextPath
+      : "/dashboard";
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
@@ -85,15 +91,8 @@ const SigninContent = () => {
       setEmail("");
       setPassword("");
       setSuccess(data.message);
+      setRedirectPath(safeNext);
       setLoading(false);
-
-      const nextPath = searchParams.get("next");
-      const safeNext =
-        nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
-          ? nextPath
-          : "/dashboard";
-      router.replace(safeNext);
-      router.refresh();
     } catch (error) {
       console.log("Error:", error.message);
       setError("Something went wrong!!");
@@ -142,13 +141,22 @@ const SigninContent = () => {
           </div>
         ) : null}
 
-        <button
-          disabled={loading}
-          type="submit"
-          className="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(10,132,255,0.20)] interactive disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
+        {success ? (
+          <Link
+            href={redirectPath}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(10,132,255,0.20)] interactive"
+          >
+            Continue to dashboard
+          </Link>
+        ) : (
+          <button
+            disabled={loading}
+            type="submit"
+            className="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_34px_rgba(10,132,255,0.20)] interactive disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {loading ? "Signing in…" : "Sign in"}
+          </button>
+        )}
       </form>
 
       <p className="mt-5 text-center text-xs text-[color:var(--muted)]">
