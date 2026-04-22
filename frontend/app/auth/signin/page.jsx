@@ -50,6 +50,8 @@ const SigninContent = () => {
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
     setLoading(true);
+    setError("");
+    setSuccess("");
     try {
       const res = await apiFetch("/auth/signin", {
         method: "POST",
@@ -65,7 +67,20 @@ const SigninContent = () => {
         throw new Error("Signin failed");
       }
       const data = await res.json();
-      setUser(data.user);
+      let authenticatedUser = data?.user ?? null;
+
+      // Re-validate session from cookie before redirecting to guarded routes.
+      const meRes = await apiFetch("/auth/me");
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        authenticatedUser = meData?.user ?? authenticatedUser;
+      }
+
+      if (!authenticatedUser) {
+        throw new Error("Session was not established");
+      }
+
+      setUser(authenticatedUser);
 
       setEmail("");
       setPassword("");
@@ -77,7 +92,8 @@ const SigninContent = () => {
         nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
           ? nextPath
           : "/dashboard";
-      router.push(safeNext);
+      router.replace(safeNext);
+      router.refresh();
     } catch (error) {
       console.log("Error:", error.message);
       setError("Something went wrong!!");
