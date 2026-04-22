@@ -13,14 +13,19 @@ export const UserProvider = ({ children }) => {
     try {
       const res = await apiFetch("/auth/me");
       if (!res.ok) {
-        setUser(null);
+        setUser((prev) => prev ?? null);
         return;
       }
       const data = await res.json();
-      setUser(data?.user ?? null);
+      setUser((prev) => {
+        const nextUser = data?.user ?? null;
+        // Avoid clobbering a freshly signed-in user with a stale null response.
+        if (!nextUser && prev) return prev;
+        return nextUser;
+      });
     } catch (error) {
       console.warn("User fetch failed. Backend may be offline.", error);
-      setUser(null);
+      setUser((prev) => prev ?? null);
     } finally {
       setLoading(false);
     }
