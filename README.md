@@ -1,6 +1,6 @@
 # AlphaMail
 
-AlphaMail is an AI-powered Gmail workspace that combines inbox sync, semantic search, and smart email tagging in one product. It is built as a monorepo with a Next.js frontend, an Express API backend, and a BullMQ worker that processes sync and indexing jobs.
+AlphaMail is an AI-powered Gmail workspace that combines inbox sync, semantic search, smart email tagging, and an agentic inbox triage assistant in one product. It is built as a monorepo with a Next.js frontend, an Express API backend, and a BullMQ worker that processes sync and indexing jobs.
 
 
 
@@ -15,6 +15,7 @@ AlphaMail is an AI-powered Gmail workspace that combines inbox sync, semantic se
 - [Local Development](#local-development)
 - [Google OAuth and Gmail Setup](#google-oauth-and-gmail-setup)
 - [Semantic Search and Embeddings](#semantic-search-and-embeddings)
+- [Agentic Inbox Triage Flow](#agentic-inbox-triage-flow)
 - [Available Scripts](#available-scripts)
 - [Operational Notes](#operational-notes)
 - [Troubleshooting](#troubleshooting)
@@ -26,7 +27,7 @@ AlphaMail solves three core problems in modern email workflows:
 
 1. **Inbox overload** through prioritized tags like `needs_reply`, `deadline`, `follow_up`, and `spam`.
 2. **Slow retrieval** through semantic search over indexed email content.
-3. **Context loss** through account-aware thread reading, attachments, and real-time sync updates.
+3. **Context loss** through account-aware thread reading, attachments, real-time sync updates, and grounded AI triage over live inbox data.
 
 The app supports multiple connected Gmail accounts per user and keeps imported email data in MongoDB for fast filtering, analytics, and search.
 
@@ -35,7 +36,8 @@ The app supports multiple connected Gmail accounts per user and keeps imported e
 - Designed as a full-stack distributed system, not just a UI prototype.
 - Implements real-time data ingestion and update propagation using queue + sockets.
 - Combines deterministic heuristics with semantic AI search for practical productivity gains.
-- Handles end-to-end complexity: OAuth, background jobs, content sanitization, and ML embedding pipelines.
+- Adds an agentic tool-calling layer that turns inbox data into prioritized, actionable summaries.
+- Handles end-to-end complexity: OAuth, background jobs, content sanitization, ML embedding pipelines, and AI-assisted triage.
 
 ## Core Features
 
@@ -90,15 +92,27 @@ The app supports multiple connected Gmail accounts per user and keeps imported e
 - Search supports account/date/label filtering.
 - Frontend displays ranked matches with relevance score.
 
+### 7) Agentic Inbox Triage
+
+- Floating AI assistant in the dashboard for natural-language inbox queries.
+- Gemini-powered tool-calling flow grounded in live mailbox data.
+- Triage tools currently include:
+  - `search_emails`
+  - `get_tag_counts`
+  - `get_thread`
+- Responses are scoped to the active account/date filters and prioritize unread, deadline, follow-up, and reply-needed threads.
+- Assistant returns concise summaries and recommended next actions instead of generic chat output.
+
 ## Architecture
 
 ### Service Layout
 
 - **Frontend (`frontend`)**: Next.js app (dashboard, auth pages, inbox UI, search UI).
-- **Backend API (`backend`)**: Express app (auth, Gmail integration, read APIs, search APIs).
+- **Backend API (`backend`)**: Express app (auth, Gmail integration, read APIs, search APIs, AI triage APIs).
 - **Worker (`backend/workers/emailWorker.js`)**: BullMQ consumer for sync jobs.
 - **MongoDB**: Stores users, connected accounts, emails, tag rules, embeddings.
 - **Redis**: Queue broker + pub/sub support for worker and socket fanout.
+- **Gemini API**: Powers the inbox triage assistant through tool calling.
 
 ### Data Flow (High Level)
 
@@ -108,6 +122,9 @@ The app supports multiple connected Gmail accounts per user and keeps imported e
 4. Embedding indexing runs for semantic search.
 5. Pub/Sub pushes trigger incremental sync jobs.
 6. Socket events stream updates to the inbox in real time.
+7. User sends a natural-language triage request from the dashboard assistant.
+8. Backend invokes Gemini with tool definitions for inbox search, tag counts, and thread retrieval.
+9. Tool results are fed back into the model, which returns a grounded priority summary and next actions.
 
 ## Tech Stack
 
@@ -134,6 +151,7 @@ The app supports multiple connected Gmail accounts per user and keeps imported e
 - Python embedding worker
 - `sentence-transformers==2.7.0`
 - Model: `all-MiniLM-L6-v2` (384 dimensions)
+- Gemini API for tool-calling inbox triage
 
 ### Infra
 
@@ -189,6 +207,8 @@ Create `backend/.env` using `backend/.env.example` as baseline.
 | `PUBSUB_PUSH_SERVICE_ACCOUNT` | Yes for incremental sync | Expected push signer service account email. |
 | `PUBSUB_PUSH_AUDIENCE` | Yes for incremental sync | Expected JWT audience for Pub/Sub pushes. |
 | `PUBSUB_LABELS` | Optional | Gmail labels to watch, default `INBOX`. |
+| `GEMINI_API_KEY` | Yes for AI triage | Gemini API key used by the inbox triage assistant. |
+| `GEMINI_MODEL` | Optional | Gemini model name, default `gemini-2.5-flash`. |
 
 ### Frontend (`frontend/.env.local`)
 
@@ -285,6 +305,31 @@ Semantic search requires embeddings and vector search support.
 - Stores vectors in `email_embeddings` collection.
 - Runs `$vectorSearch` query in search API.
 
+## Agentic Inbox Triage Flow
+
+The inbox assistant is intentionally narrow and grounded. It is designed to answer inbox-prioritization questions using internal tools rather than freeform generation.
+
+### Current flow
+
+1. User opens the floating `AlphaMail AI` assistant in the dashboard.
+2. User asks a question such as:
+   - `What needs my attention today?`
+   - `Show unread emails that need a reply.`
+   - `Find deadline-related emails from the last 7 days.`
+3. Frontend sends the request to `POST /gmail/agent/triage` along with the current account/date filters and selected thread context when available.
+4. Backend invokes Gemini with a system prompt plus tool definitions.
+5. Gemini chooses one or more tools such as `search_emails`, `get_tag_counts`, or `get_thread`.
+6. Backend executes the selected tools against MongoDB summaries and Gmail thread data.
+7. Tool results are returned to Gemini.
+8. Gemini responds with a grounded triage summary and recommended next actions.
+
+### Scope of the current assistant
+
+- Focused on inbox understanding, not autonomous execution.
+- Read-oriented by default; it does not send emails or take destructive actions.
+- Uses real synced inbox data rather than sample prompts or mock context.
+- Best suited for prioritization, retrieval, and thread-aware summarization.
+
 ### Required vector index
 
 The backend expects a vector index named:
@@ -341,6 +386,7 @@ node scripts/backfill-tags.js
 - Frontend calls API with `credentials: include`, so cookie auth and CORS origin setup must match.
 - A separate worker process is mandatory for queue jobs (sync and incremental updates).
 - First semantic query may be slower if model assets are being loaded.
+- Gemini triage requests may occasionally hit transient provider rate limits or temporary `503` model availability spikes; backend includes retry/fallback handling.
 - If Gmail history becomes invalid/expired, backend falls back to full account sync logic.
 
 ## Troubleshooting
@@ -363,6 +409,18 @@ node scripts/backfill-tags.js
 - Confirm `email_embeddings_vector` index exists.
 - Ensure embeddings are present for user/account documents.
 
+### AI triage returns configuration errors
+
+- Confirm `GEMINI_API_KEY` is present in `backend/.env`.
+- Optionally set `GEMINI_MODEL`, otherwise the backend defaults to `gemini-2.5-flash`.
+- Check `GET /gmail/agent/debug` to confirm the backend detects Gemini configuration.
+
+### AI triage returns generic provider failures
+
+- Retry the request once if Gemini returns a temporary `503` or rate-limit response.
+- Confirm outbound internet access from the backend runtime.
+- Check backend logs for model-specific quota or availability messages.
+
 ### Sync starts but inbox remains empty
 
 - Confirm worker process is running and connected to Redis.
@@ -374,5 +432,5 @@ node scripts/backfill-tags.js
 - Current provider integration is Gmail-focused.
 - Payment flows and admin/RBAC are intentionally out of scope for this build.
 - Semantic search requires vector index setup in MongoDB for full capability.
+- The current AI assistant is intentionally scoped to inbox triage and retrieval, not autonomous reply generation or broad multi-agent workflows.
 - Automated test coverage is the next engineering hardening step.
-
