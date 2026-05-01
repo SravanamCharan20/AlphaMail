@@ -3,11 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FaSpinner } from "react-icons/fa";
 import {
+  FiArrowUpRight,
   FiCalendar,
   FiChevronDown,
   FiInbox,
   FiMail,
+  FiMessageCircle,
   FiSearch,
+  FiSend,
   FiX,
 } from "react-icons/fi";
 import EmailCards from "./components/EmailCards";
@@ -22,6 +25,79 @@ import {
   getThreadKey,
 } from "./emailUtils";
 import { matchesFilters } from "./filterUtils";
+
+const AGENT_TOOL_LABELS = {
+  search_emails: "Inbox search",
+  get_tag_counts: "Tag summary",
+  get_thread: "Thread context",
+};
+
+const parseAgentAnswer = (value) => {
+  const lines = String(value || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const blocks = [];
+  let currentList = null;
+  let currentParagraph = [];
+
+  const flushParagraph = () => {
+    if (!currentParagraph.length) return;
+    blocks.push({
+      type: "paragraph",
+      text: currentParagraph.join(" "),
+    });
+    currentParagraph = [];
+  };
+
+  const flushList = () => {
+    if (!currentList?.items?.length) return;
+    blocks.push(currentList);
+    currentList = null;
+  };
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^\*\*(.+?)\*\*:?$/);
+    const bulletMatch = line.match(/^\*\s+(.*)$/);
+    const numberedMatch = line.match(/^\d+\.\s+(.*)$/);
+
+    if (headingMatch) {
+      flushParagraph();
+      flushList();
+      blocks.push({ type: "heading", text: headingMatch[1] });
+      continue;
+    }
+
+    if (bulletMatch) {
+      flushParagraph();
+      if (!currentList || currentList.style !== "bullet") {
+        flushList();
+        currentList = { type: "list", style: "bullet", items: [] };
+      }
+      currentList.items.push(bulletMatch[1].replace(/\*\*/g, ""));
+      continue;
+    }
+
+    if (numberedMatch) {
+      flushParagraph();
+      if (!currentList || currentList.style !== "numbered") {
+        flushList();
+        currentList = { type: "list", style: "numbered", items: [] };
+      }
+      currentList.items.push(numberedMatch[1].replace(/\*\*/g, ""));
+      continue;
+    }
+
+    flushList();
+    currentParagraph.push(line.replace(/\*\*/g, ""));
+  }
+
+  flushParagraph();
+  flushList();
+
+  return blocks;
+};
 
 const EmailSidebar = () => {
   const [messages, setMessages] = useState([]);
@@ -63,6 +139,13 @@ const EmailSidebar = () => {
     account: "",
     error: null,
   });
+  const [agentQuery, setAgentQuery] = useState("");
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentAnswer, setAgentAnswer] = useState("");
+  const [agentError, setAgentError] = useState(null);
+  const [agentToolCalls, setAgentToolCalls] = useState([]);
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentLastPrompt, setAgentLastPrompt] = useState("");
 
   const filtersRef = useRef({ account: "all", range: "all", tags: [] });
   const lastFiltersRef = useRef({ account: "all", range: "all", tags: [] });
@@ -243,6 +326,55 @@ const EmailSidebar = () => {
       setSearchCount(0);
     } finally {
       setSearchLoading(false);
+    }
+  };
+
+  const submitAgentQuery = async (queryText) => {
+    const trimmed = String(queryText || "").trim();
+    if (!trimmed) return;
+
+    setAgentLoading(true);
+    setAgentError(null);
+    setAgentLastPrompt(trimmed);
+    setAgentOpen(true);
+
+    try {
+      const res = await apiFetch("/gmail/agent/triage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: trimmed,
+          account: accountFilter,
+          range: dateRange,
+          selectedThread: selectedThread
+            ? {
+                threadId: selectedThread.threadId,
+                account: selectedThread.account,
+                subject: selectedThread.subject,
+              }
+            : null,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAgentError(
+          data?.details || data?.message || "Agent request failed."
+        );
+        setAgentAnswer("");
+        setAgentToolCalls([]);
+        return;
+      }
+
+      setAgentAnswer(String(data?.answer || "").trim());
+      setAgentToolCalls(Array.isArray(data?.toolCalls) ? data.toolCalls : []);
+    } catch (error) {
+      console.warn("Agent request failed", error);
+      setAgentError("Agent request failed.");
+      setAgentAnswer("");
+      setAgentToolCalls([]);
+    } finally {
+      setAgentLoading(false);
     }
   };
 
@@ -887,6 +1019,26 @@ const EmailSidebar = () => {
     setThreadError(null);
   };
 
+  const quickPrompts = [
+    "What needs my attention today?",
+    "Show unread emails that need a reply.",
+    "Find deadline-related emails from the last 7 days.",
+  ];
+  const agentAnswerBlocks = useMemo(
+    () => parseAgentAnswer(agentAnswer),
+    [agentAnswer]
+  );
+  const agentUsedTools = useMemo(() => {
+    const seen = new Set();
+    return agentToolCalls
+      .map((call) => call?.name)
+      .filter((name) => {
+        if (!name || seen.has(name)) return false;
+        seen.add(name);
+        return true;
+      });
+  }, [agentToolCalls]);
+
   const getPaginationItems = (current, pages) => {
     if (!pages || pages <= 1) return [];
     if (pages <= 7) {
@@ -1322,6 +1474,231 @@ const EmailSidebar = () => {
         />
       </div>
     </div>
+
+      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[calc(100vw-2rem)] max-w-[390px] flex-col items-end sm:bottom-6 sm:right-6">
+        <div
+          className={`pointer-events-auto w-full overflow-hidden rounded-[28px] border border-black/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(245,247,251,0.94))] shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl transition-all duration-300 ${
+            agentOpen
+              ? "max-h-[78vh] translate-y-0 opacity-100"
+              : "pointer-events-none max-h-0 translate-y-4 opacity-0"
+          }`}
+        >
+          <div className="border-b border-black/5 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--accent)] text-white shadow-[0_12px_30px_rgba(10,132,255,0.28)]">
+                  <FiMessageCircle className="text-[18px]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[color:var(--ink)]">
+                    AlphaMail AI
+                  </p>
+                  <p className="text-[11px] text-[color:var(--muted)]">
+                    Triage with {accountLabel} and {dateLabel.toLowerCase()}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAgentOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-black/10 bg-white text-gray-500 transition hover:bg-black/5 hover:text-gray-700"
+                aria-label="Close AlphaMail AI"
+              >
+                <FiX className="text-[16px]" />
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-[52vh] space-y-4 overflow-y-auto px-4 py-4 scrollbar-subtle">
+            <div className="rounded-2xl border border-[color:var(--accent)]/15 bg-[color:var(--accent)]/6 px-3.5 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--accent)]/80">
+                Suggested
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => {
+                      setAgentQuery(prompt);
+                      submitAgentQuery(prompt);
+                    }}
+                    className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-gray-700 transition hover:bg-black/5"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {agentLastPrompt ? (
+              <div className="flex justify-end">
+                <div className="max-w-[88%] rounded-[22px] rounded-br-md bg-[color:var(--accent)] px-4 py-3 text-sm font-medium text-white shadow-[0_16px_40px_rgba(10,132,255,0.28)]">
+                  {agentLastPrompt}
+                </div>
+              </div>
+            ) : null}
+
+            {agentLoading ? (
+              <div className="flex items-start gap-3">
+                <div className="mt-1 grid h-9 w-9 place-items-center rounded-2xl bg-white text-[color:var(--accent)] shadow-sm">
+                  <FaSpinner className="animate-spin text-[15px]" />
+                </div>
+                <div className="max-w-[88%] rounded-[22px] rounded-bl-md border border-black/10 bg-white px-4 py-3 text-sm text-[color:var(--muted)] shadow-sm">
+                  Reviewing your inbox and pulling the most relevant threads.
+                </div>
+              </div>
+            ) : null}
+
+            {agentError ? (
+              <div className="flex items-start gap-3">
+                <div className="mt-1 grid h-9 w-9 place-items-center rounded-2xl bg-rose-50 text-rose-600 shadow-sm">
+                  <FiX className="text-[15px]" />
+                </div>
+                <div className="max-w-[88%] rounded-[22px] rounded-bl-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
+                  {agentError}
+                </div>
+              </div>
+            ) : null}
+
+            {agentAnswer ? (
+              <div className="flex items-start gap-3">
+                <div className="mt-1 grid h-9 w-9 place-items-center rounded-2xl bg-white text-[color:var(--accent)] shadow-sm">
+                  <FiMessageCircle className="text-[15px]" />
+                </div>
+                <div className="max-w-[88%] rounded-[22px] rounded-bl-md border border-black/10 bg-white px-4 py-4 shadow-sm">
+                  <div className="space-y-3 text-sm leading-relaxed text-[color:var(--ink)]">
+                    {agentAnswerBlocks.map((block, index) => {
+                      if (block.type === "heading") {
+                        return (
+                          <p
+                            key={`heading-${index}`}
+                            className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400"
+                          >
+                            {block.text}
+                          </p>
+                        );
+                      }
+
+                      if (block.type === "list") {
+                        return (
+                          <div key={`list-${index}`} className="space-y-2">
+                            {block.items.map((item, itemIndex) => (
+                              <div
+                                key={`item-${itemIndex}`}
+                                className="flex items-start gap-2.5"
+                              >
+                                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[color:var(--accent)]" />
+                                <p className="flex-1 text-sm text-[color:var(--ink)]">
+                                  {block.style === "numbered"
+                                    ? `${itemIndex + 1}. ${item}`
+                                    : item}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <p key={`paragraph-${index}`} className="text-sm">
+                          {block.text}
+                        </p>
+                      );
+                    })}
+                  </div>
+
+                  {agentUsedTools.length ? (
+                    <div className="mt-4 border-t border-black/5 pt-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+                        Grounded with
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {agentUsedTools.map((name) => (
+                          <span
+                            key={name}
+                            className="rounded-full border border-black/10 bg-[var(--canvas)] px-2.5 py-1 text-[10px] font-semibold text-gray-600"
+                          >
+                            {AGENT_TOOL_LABELS[name] || name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="border-t border-black/5 bg-white/70 px-4 py-3">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitAgentQuery(agentQuery);
+              }}
+            >
+              <div className="rounded-[24px] border border-black/10 bg-white px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)]">
+                <textarea
+                  value={agentQuery}
+                  onChange={(event) => setAgentQuery(event.target.value)}
+                  rows={2}
+                  placeholder="Ask what needs attention, what needs a reply, or what is urgent."
+                  className="w-full resize-none bg-transparent text-sm text-[color:var(--ink)] outline-none placeholder:text-gray-400"
+                />
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAgentAnswer("");
+                      setAgentError(null);
+                      setAgentToolCalls([]);
+                      setAgentLastPrompt("");
+                    }}
+                    className="text-[11px] font-semibold text-gray-500 transition hover:text-gray-700"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={agentLoading || !agentQuery.trim()}
+                    className="inline-flex items-center gap-2 rounded-full bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold text-white shadow-[0_14px_34px_rgba(10,132,255,0.22)] transition hover:translate-y-[-1px] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span>{agentLoading ? "Thinking..." : "Send"}</span>
+                    <FiSend className="text-[13px]" />
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setAgentOpen((prev) => !prev)}
+          className="pointer-events-auto mt-3 inline-flex items-center gap-3 rounded-full border border-black/10 bg-[color:var(--ink)] px-4 py-3 text-left text-white shadow-[0_18px_50px_rgba(15,23,42,0.28)] transition hover:translate-y-[-1px]"
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-white/10">
+            <FiMessageCircle className="text-[18px]" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">AlphaMail AI</span>
+            <span className="block text-[11px] text-white/70">
+              {agentLoading
+                ? "Reviewing inbox..."
+                : agentAnswer
+                ? "Latest triage ready"
+                : "Ask for a quick inbox read"}
+            </span>
+          </span>
+          <span className="rounded-full bg-white/10 p-2">
+            <FiArrowUpRight
+              className={`text-[14px] transition ${
+                agentOpen ? "rotate-45" : ""
+              }`}
+            />
+          </span>
+        </button>
+      </div>
     </>
   );
 };

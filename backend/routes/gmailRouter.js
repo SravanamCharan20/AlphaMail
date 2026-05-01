@@ -20,6 +20,10 @@ import {
 import { embedTexts } from "../services/embeddingService.js";
 import { normalizeText } from "../services/textChunker.js";
 import { upsertTagRules } from "../services/tagRulesService.js";
+import {
+  getTriageAgentStatus,
+  runTriageAgent,
+} from "../services/agent/triageAgent.js";
 
 const gmailRouter = express.Router();
 
@@ -428,6 +432,54 @@ gmailRouter.get("/search", userAuth, async (req, res) => {
     console.error("[search] semantic search failed", error);
     return res.status(500).json({ message: "Semantic search failed" });
   }
+});
+
+gmailRouter.post("/agent/triage", userAuth, async (req, res) => {
+  try {
+    const userId = req.user;
+    const query = String(req.body?.query || "").trim();
+    const account = String(req.body?.account || "all").trim() || "all";
+    const range = String(req.body?.range || "all").trim().toLowerCase() || "all";
+    const selectedThread =
+      req.body?.selectedThread &&
+      typeof req.body.selectedThread === "object"
+        ? {
+            threadId: String(req.body.selectedThread.threadId || "").trim(),
+            account: String(req.body.selectedThread.account || "").trim(),
+            subject: String(req.body.selectedThread.subject || "").trim(),
+          }
+        : null;
+
+    if (!query) {
+      return res.status(400).json({ message: "Query is required" });
+    }
+
+    const result = await runTriageAgent({
+      userId,
+      query,
+      account,
+      range,
+      selectedThread,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error("[agent] triage failed", error?.message || error);
+    const isConfigError = error?.code === "MISSING_GEMINI_API_KEY";
+    return res.status(isConfigError ? 503 : 500).json({
+      message: "Failed to run inbox triage",
+      ...(process.env.NODE_ENV !== "production" && {
+        details: error?.message || String(error),
+      }),
+    });
+  }
+});
+
+gmailRouter.get("/agent/debug", userAuth, async (req, res) => {
+  return res.json({
+    ok: true,
+    config: getTriageAgentStatus(),
+  });
 });
 
 gmailRouter.get("/threads/:threadId", userAuth, async (req, res) => {
