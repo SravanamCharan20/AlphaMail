@@ -1,10 +1,19 @@
 import json
 import os
 import sys
+import warnings
 from typing import List
 
 os.environ.setdefault("USE_TF", "0")
 os.environ.setdefault("USE_TORCH", "1")
+
+try:
+    from urllib3.exceptions import NotOpenSSLWarning
+
+    warnings.filterwarnings("ignore", category=NotOpenSSLWarning)
+except Exception:
+    # Keep startup resilient if urllib3 internals change.
+    pass
 
 from sentence_transformers import SentenceTransformer
 

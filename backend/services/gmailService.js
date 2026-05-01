@@ -240,13 +240,26 @@ export const watchMailboxForAccount = async (account) => {
 
   const gmail = createGmailClient(account);
 
-  const response = await gmail.users.watch({
-    userId: "me",
-    requestBody: {
-      topicName,
-      labelIds,
-    },
-  });
+  let response;
+  try {
+    response = await gmail.users.watch({
+      userId: "me",
+      requestBody: {
+        topicName,
+        labelIds,
+      },
+    });
+  } catch (error) {
+    const details =
+      error?.response?.data?.error?.message ||
+      error?.message ||
+      "Unknown Gmail watch error";
+    throw new Error(
+      `Gmail watch failed for ${account.email}: ${details}. ` +
+        "Verify PUBSUB_TOPIC, topic publish permission for " +
+        "gmail-api-push@system.gserviceaccount.com, and that a push subscription exists."
+    );
+  }
 
   const historyId = response?.data?.historyId;
   const expirationMs = Number(response?.data?.expiration);
@@ -269,6 +282,43 @@ export const watchMailboxForAccount = async (account) => {
   );
 
   return response?.data;
+};
+
+export const refreshMailboxWatchForUser = async (userId, accountEmail = null) => {
+  const query = { userId };
+  if (accountEmail) {
+    query.email = accountEmail;
+  }
+
+  const accounts = await EmailAccount.find(query).select(
+    "_id email accessToken refreshToken watchExpiration watchTopic watchLabels"
+  );
+
+  const results = [];
+  for (const account of accounts) {
+    try {
+      const watch = await watchMailboxForAccount(account);
+      results.push({
+        account: account.email,
+        ok: true,
+        historyId: watch?.historyId || null,
+        expiration: watch?.expiration
+          ? new Date(Number(watch.expiration)).toISOString()
+          : null,
+      });
+    } catch (error) {
+      results.push({
+        account: account.email,
+        ok: false,
+        error: error?.message || String(error),
+      });
+    }
+  }
+
+  return {
+    refreshed: results.length,
+    results,
+  };
 };
 
 export const syncIncrementalForAccount = async ({

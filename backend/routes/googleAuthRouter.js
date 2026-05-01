@@ -9,7 +9,10 @@ import EmailEmbedding from "../models/EmailEmbedding.js";
 import userAuth from "../middlewares/auth.js";
 import { SCOPES, createOAuth2Client } from "./constants.js";
 import { emailQueue } from "../queues/emailQueue.js";
-import { watchMailboxForAccount } from "../services/gmailService.js";
+import {
+  refreshMailboxWatchForUser,
+  watchMailboxForAccount,
+} from "../services/gmailService.js";
 import { buildClientUrl } from "../config/app.js";
 dotenv.config();
 
@@ -161,13 +164,30 @@ googleAuthRouter.get("/google/callback", async (req, res) => {
 googleAuthRouter.get("/accounts", userAuth, async (req, res) => {
   try {
     const accounts = await EmailAccount.find({ userId: req.user })
-      .select("provider email scopes tokenExpiry createdAt updatedAt")
+      .select(
+        "provider email scopes tokenExpiry createdAt updatedAt lastHistoryId watchExpiration watchLabels watchTopic"
+      )
       .sort({ updatedAt: -1 });
 
     return res.status(200).json({ accounts });
   } catch (err) {
     console.error("Error fetching connected accounts:", err);
     return res.status(500).json({ message: "Failed to fetch accounts" });
+  }
+});
+
+googleAuthRouter.post("/accounts/watch/refresh", userAuth, async (req, res) => {
+  try {
+    const accountEmail = String(req.body?.account || "").trim() || null;
+    const result = await refreshMailboxWatchForUser(req.user, accountEmail);
+
+    return res.status(200).json({
+      message: "Watch refresh completed",
+      ...result,
+    });
+  } catch (err) {
+    console.error("Error refreshing Gmail watch:", err);
+    return res.status(500).json({ message: "Failed to refresh Gmail watch" });
   }
 });
 

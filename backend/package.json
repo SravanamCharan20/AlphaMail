@@ -8,6 +8,7 @@
     "dev": "nodemon index.js",
     "worker:start": "node workers/emailWorker.js",
     "worker:dev": "nodemon workers/emailWorker.js",
+    "embeddings:install": "python3 -m pip install -r workers/requirements-embeddings.txt",
     "preload:embeddings": "python3 workers/preload_embeddings.py"
   },
   "keywords": [],

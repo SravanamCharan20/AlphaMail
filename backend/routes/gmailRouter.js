@@ -23,6 +23,16 @@ import { upsertTagRules } from "../services/tagRulesService.js";
 
 const gmailRouter = express.Router();
 
+const toBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(normalized)) return true;
+    if (["0", "false", "no", "off"].includes(normalized)) return false;
+  }
+  return false;
+};
+
 const resolveAccountForThread = async ({ userId, accountEmail, threadId }) => {
   if (accountEmail) {
     return EmailAccount.findOne({ userId, email: accountEmail });
@@ -138,6 +148,38 @@ gmailRouter.post("/push", async (req, res) => {
     console.error("[pubsub] Push failed", error?.message || error);
     const status = error?.message?.includes("Authorization") ? 401 : 500;
     return res.status(status).json({ message: "Pub/Sub push failed" });
+  }
+});
+
+gmailRouter.get("/push/debug", userAuth, async (req, res) => {
+  try {
+    const accounts = await EmailAccount.find({ userId: req.user })
+      .select("email lastHistoryId watchExpiration watchLabels watchTopic updatedAt")
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    return res.json({
+      webhookPath: "/gmail/push",
+      env: {
+        hasPubSubTopic: Boolean(process.env.PUBSUB_TOPIC),
+        pubSubTopic: process.env.PUBSUB_TOPIC || null,
+        hasPushAudience: Boolean(process.env.PUBSUB_PUSH_AUDIENCE),
+        pushAudience: process.env.PUBSUB_PUSH_AUDIENCE || null,
+        hasPushServiceAccount: Boolean(process.env.PUBSUB_PUSH_SERVICE_ACCOUNT),
+        pushServiceAccount: process.env.PUBSUB_PUSH_SERVICE_ACCOUNT || null,
+        pubSubLabels: process.env.PUBSUB_LABELS || "INBOX",
+      },
+      accounts: accounts.map((account) => ({
+        ...account,
+        watchActive:
+          account.watchExpiration instanceof Date
+            ? account.watchExpiration.getTime() > Date.now()
+            : false,
+      })),
+    });
+  } catch (error) {
+    console.error("[pubsub] Debug status failed", error?.message || error);
+    return res.status(500).json({ message: "Failed to load push debug status" });
   }
 });
 
@@ -531,7 +573,7 @@ gmailRouter.patch("/threads/:threadId/read", userAuth, async (req, res) => {
     const userId = req.user;
     const { threadId } = req.params;
     const accountEmail = req.query.account;
-    const unread = Boolean(req.body?.unread);
+    const unread = toBoolean(req.body?.unread);
 
     const account = await resolveAccountForThread({
       userId,

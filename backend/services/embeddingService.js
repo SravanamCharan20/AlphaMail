@@ -9,9 +9,10 @@ const WORKER_PATH = path.resolve(__dirname, "../workers/embedding_worker.py");
 let workerProcess = null;
 let workerInterface = null;
 let pendingQueue = [];
+let workerUnavailableError = null;
 
 const startWorker = () => {
-  if (workerProcess) return;
+  if (workerProcess || workerUnavailableError) return;
 
   workerProcess = spawn("python3", [WORKER_PATH, "--server"], {
     stdio: ["pipe", "pipe", "pipe"],
@@ -40,8 +41,32 @@ const startWorker = () => {
     console.warn("[embedding] worker stderr", data.toString());
   });
 
+  workerProcess.on("error", (err) => {
+    workerUnavailableError = new Error(`Failed to start embedding worker: ${err.message}`);
+    pendingQueue.forEach((pending) => pending.reject(workerUnavailableError));
+    pendingQueue = [];
+  });
+
+  workerProcess.stdin.on("error", (err) => {
+    if (err?.code === "EPIPE") {
+      workerUnavailableError = new Error(
+        "Embedding worker pipe closed. Install Python dependencies with: python3 -m pip install -r workers/requirements-embeddings.txt"
+      );
+    } else {
+      workerUnavailableError = new Error(`Embedding worker stdin error: ${err.message}`);
+    }
+    pendingQueue.forEach((pending) => pending.reject(workerUnavailableError));
+    pendingQueue = [];
+  });
+
   workerProcess.on("close", (code) => {
-    const err = new Error(`Embedding worker exited ${code}`);
+    let err = new Error(`Embedding worker exited ${code}`);
+    if (code !== 0) {
+      err = new Error(
+        "Embedding worker failed to start. Install Python dependencies with: python3 -m pip install -r workers/requirements-embeddings.txt"
+      );
+      workerUnavailableError = err;
+    }
     pendingQueue.forEach((pending) => pending.reject(err));
     pendingQueue = [];
     workerProcess = null;
@@ -61,11 +86,24 @@ export const embedTexts = (texts = []) =>
 
     startWorker();
 
+    if (workerUnavailableError) {
+      reject(workerUnavailableError);
+      return;
+    }
+
     if (!workerProcess?.stdin?.writable) {
       reject(new Error("Embedding worker is not available"));
       return;
     }
 
     pendingQueue.push({ resolve, reject });
-    workerProcess.stdin.write(`${JSON.stringify({ texts })}\n`);
+    workerProcess.stdin.write(`${JSON.stringify({ texts })}\n`, (err) => {
+      if (!err) return;
+      pendingQueue.pop();
+      reject(
+        new Error(
+          `Failed to send request to embedding worker: ${err.message}. Run: python3 -m pip install -r workers/requirements-embeddings.txt`
+        )
+      );
+    });
   });
