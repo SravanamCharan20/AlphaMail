@@ -18,9 +18,6 @@ const ALLOWED_TAGS = new Set([
   "spam",
 ]);
 
-const escapeRegex = (value) =>
-  String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 const clampLimit = (value, fallback = 5, max = 10) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return fallback;
@@ -31,12 +28,6 @@ const normalizeTags = (tags = []) =>
   Array.isArray(tags)
     ? tags.filter((tag) => ALLOWED_TAGS.has(tag))
     : [];
-
-const truncate = (value, max = 900) => {
-  const text = String(value || "").trim();
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1)}…`;
-};
 
 const getDateRangeBounds = (range) => {
   const normalized = String(range || "all").toLowerCase();
@@ -104,10 +95,10 @@ const buildEmailQuery = ({ userId, account, range, tags }) => {
 const mapEmailSummary = (email) => ({
   threadId: email.threadId,
   account: email.account,
-  subject: truncate(email.subject || "", 160),
-  from: truncate(email.from || "", 120),
-  to: truncate(email.to || "", 120),
-  snippet: truncate(email.snippet || "", 220),
+  subject: email.subject || "",
+  from: email.from || "",
+  to: email.to || "",
+  snippet: email.snippet || "",
   receivedAt: email.receivedAt || null,
   isUnread: Boolean(email.isUnread),
   tags: Array.isArray(email.tags) ? email.tags : [],
@@ -167,11 +158,11 @@ const fetchThreadDetails = async ({ userId, threadId, account }) => {
     return {
       id: message.id,
       threadId: message.threadId,
-      subject: truncate(subject || "", 160),
-      from: truncate(from || "", 120),
-      to: truncate(to || "", 120),
-      snippet: truncate(message.snippet || "", 220),
-      bodyText: truncate(bodyText || "", 4000),
+      subject: subject || "",
+      from: from || "",
+      to: to || "",
+      snippet: message.snippet || "",
+      bodyText: bodyText || "",
       receivedAt,
       isUnread: Array.isArray(message.labelIds)
         ? message.labelIds.includes("UNREAD")
@@ -188,19 +179,11 @@ const fetchThreadDetails = async ({ userId, threadId, account }) => {
   return {
     threadId,
     account: accountRecord.email,
-    messageCount: messages.length,
     messages,
   };
 };
 
-const semanticSearchEmails = async ({
-  userId,
-  query,
-  account,
-  range,
-  tags,
-  limit,
-}) => {
+const semanticSearchEmails = async ({ userId, query, account, range, tags, limit }) => {
   const queryText = normalizeText(query || "");
   if (!queryText) return [];
 
@@ -251,6 +234,7 @@ const semanticSearchEmails = async ({
         account: 1,
         subject: 1,
         from: 1,
+        labels: 1,
         tags: 1,
         receivedAt: 1,
         chunkText: 1,
@@ -274,9 +258,9 @@ const semanticSearchEmails = async ({
     .map((item) => ({
       threadId: item.threadId,
       account: item.account,
-      subject: truncate(item.subject || "", 160),
-      from: truncate(item.from || "", 120),
-      snippet: truncate(item.chunkText || "", 220),
+      subject: item.subject || "",
+      from: item.from || "",
+      snippet: item.chunkText || "",
       receivedAt: item.receivedAt || null,
       tags: Array.isArray(item.tags) ? item.tags : [],
       searchScore: item.score,
@@ -292,25 +276,21 @@ export const toolHandlers = {
     const tags = normalizeTags(args.tags);
 
     if (query) {
-      try {
-        const semanticResults = await semanticSearchEmails({
-          userId,
-          query,
-          account,
-          range,
-          tags,
-          limit,
-        });
+      const semanticResults = await semanticSearchEmails({
+        userId,
+        query,
+        account,
+        range,
+        tags,
+        limit,
+      });
 
-        if (semanticResults.length) {
-          return {
-            mode: "semantic",
-            count: semanticResults.length,
-            results: semanticResults,
-          };
-        }
-      } catch (error) {
-        console.warn("[agent] semantic search fallback", error?.message || error);
+      if (semanticResults.length) {
+        return {
+          mode: "semantic",
+          count: semanticResults.length,
+          results: semanticResults,
+        };
       }
     }
 
@@ -322,11 +302,10 @@ export const toolHandlers = {
     });
 
     if (query) {
-      const safePattern = escapeRegex(query);
       mongoQuery.$or = [
-        { subject: { $regex: safePattern, $options: "i" } },
-        { from: { $regex: safePattern, $options: "i" } },
-        { snippet: { $regex: safePattern, $options: "i" } },
+        { subject: { $regex: query, $options: "i" } },
+        { from: { $regex: query, $options: "i" } },
+        { snippet: { $regex: query, $options: "i" } },
       ];
     }
 
