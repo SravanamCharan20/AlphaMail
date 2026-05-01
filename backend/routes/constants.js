@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 
-export const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
+export const SCOPES = ["https://www.googleapis.com/auth/gmail.modify"];
 
 export const createOAuth2Client = () =>
   new google.auth.OAuth2(

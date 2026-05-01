@@ -33,6 +33,11 @@ const toBoolean = (value) => {
   return false;
 };
 
+const hasScope = (account, requiredScope) => {
+  const scopes = Array.isArray(account?.scopes) ? account.scopes : [];
+  return scopes.includes(requiredScope);
+};
+
 const resolveAccountForThread = async ({ userId, accountEmail, threadId }) => {
   if (accountEmail) {
     return EmailAccount.findOne({ userId, email: accountEmail });
@@ -441,6 +446,14 @@ gmailRouter.get("/threads/:threadId", userAuth, async (req, res) => {
       return res.status(404).json({ message: "Account not found" });
     }
 
+    if (!hasScope(account, "https://www.googleapis.com/auth/gmail.modify")) {
+      return res.status(403).json({
+        message:
+          "Connected Gmail account is missing the gmail.modify scope. Reconnect the account to enable read-state changes.",
+        code: "MISSING_GMAIL_MODIFY_SCOPE",
+      });
+    }
+
     const gmail = createGmailClient(account);
     const threadResponse = await gmail.users.threads.get({
       userId: "me",
@@ -618,6 +631,14 @@ gmailRouter.patch("/threads/:threadId/read", userAuth, async (req, res) => {
     });
   } catch (error) {
     console.error("[gmail] Update read state failed", error?.message || error);
+    const status = error?.code || error?.response?.status;
+    if (status === 403) {
+      return res.status(403).json({
+        message:
+          "Gmail denied the update. Reconnect the account with gmail.modify scope.",
+        code: "GMAIL_FORBIDDEN",
+      });
+    }
     res.status(500).json({ message: "Failed to update read state" });
   }
 });

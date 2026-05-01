@@ -79,6 +79,7 @@ const EmailSidebar = () => {
   const isSearchActive = searchQuery.trim().length > 0;
   const isEmbeddingActive = embeddingActiveCount > 0;
   const showEmbeddingBanner = isEmbeddingActive || syncing;
+  const GMAIL_MODIFY_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
 
   const updateRefs = () => {
     filtersRef.current = {
@@ -338,6 +339,13 @@ const EmailSidebar = () => {
 
   const updateReadState = async (thread, unread) => {
     if (!thread?.threadId || !thread?.account) return;
+    const accountRecord = accounts.find((item) => item.email === thread.account);
+    const accountScopes = Array.isArray(accountRecord?.scopes)
+      ? accountRecord.scopes
+      : [];
+    if (!accountScopes.includes(GMAIL_MODIFY_SCOPE)) {
+      return;
+    }
     try {
       const res = await apiFetch(
         `/gmail/threads/${thread.threadId}/read?account=${encodeURIComponent(
@@ -350,6 +358,10 @@ const EmailSidebar = () => {
         }
       );
       if (!res.ok) {
+        if (res.status === 403) {
+          console.warn("Gmail modify scope missing. Reconnect account to enable read-state updates.");
+          return;
+        }
         console.warn("Failed to update read state");
         return;
       }
