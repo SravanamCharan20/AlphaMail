@@ -2,7 +2,7 @@
 
 AlphaMail is an AI-powered Gmail workspace that combines inbox sync, semantic search, smart email tagging, and an agentic inbox triage assistant in one product. It is built as a monorepo with a Next.js frontend, an Express API backend, and a BullMQ worker that processes sync and indexing jobs.
 
-
+Video Explanation - https://youtu.be/ot0mAWHbufg
 
 ## Table of Contents
 
