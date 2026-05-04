@@ -72,8 +72,14 @@ const upsertEmailAndPublish = async ({
   });
   emailPayload.tags = mergedTags;
 
-  const result = await Email.updateOne(
-    { userId, account: accountEmail, threadId: emailPayload.threadId },
+  const emailQuery = {
+    userId,
+    account: accountEmail,
+    threadId: emailPayload.threadId,
+  };
+  const existingEmail = await Email.exists(emailQuery);
+  const emailDoc = await Email.findOneAndUpdate(
+    emailQuery,
     {
       account: accountEmail,
       threadId: emailPayload.threadId,
@@ -93,12 +99,13 @@ const upsertEmailAndPublish = async ({
       syncSource,
       lastSyncedAt: new Date(),
     },
-    { upsert: true }
+    { new: true, upsert: true, setDefaultsOnInsert: true, lean: true }
   );
 
   await publishSocketEvent(
     "email-added",
     {
+      _id: emailDoc?._id,
       account: accountEmail,
       threadId: emailPayload.threadId,
       subject: emailPayload.subject,
@@ -113,12 +120,17 @@ const upsertEmailAndPublish = async ({
       tags: mergedTags,
       spamCategory: emailPayload.spamCategory || null,
       deadlineAt: emailPayload.deadlineAt || null,
+      syncSource,
+      lastSyncedAt: emailDoc?.lastSyncedAt,
+      createdAt: emailDoc?.createdAt,
+      updatedAt: emailDoc?.updatedAt,
       isIncremental,
+      isNewThread: !existingEmail,
     },
     userId.toString()
   );
 
-  return result;
+  return emailDoc;
 };
 
 export const syncUserEmails = async (userId) => {
@@ -329,7 +341,7 @@ export const syncIncrementalForAccount = async ({
   const account = await EmailAccount.findOne({ email: emailAddress });
   if (!account) {
     console.warn("[gmail] No account for email", emailAddress);
-    return;
+    return null;
   }
 
   const gmail = createGmailClient(account);
@@ -344,7 +356,11 @@ export const syncIncrementalForAccount = async ({
       { _id: account._id },
       { lastHistoryId: historyId }
     );
-    return;
+    return {
+      userId: account.userId?.toString(),
+      account: account.email,
+      changed: true,
+    };
   }
 
   let historyResponse;
@@ -375,7 +391,11 @@ export const syncIncrementalForAccount = async ({
         { _id: account._id },
         { lastHistoryId: historyId }
       );
-      return;
+      return {
+        userId: account.userId?.toString(),
+        account: account.email,
+        changed: true,
+      };
     }
     throw error;
   }
@@ -425,7 +445,11 @@ export const syncIncrementalForAccount = async ({
       { _id: account._id },
       { lastHistoryId: latestHistoryId }
     );
-    return;
+    return {
+      userId: account.userId?.toString(),
+      account: account.email,
+      changed: false,
+    };
   }
 
   const messageDetails = await Promise.all(
@@ -454,7 +478,7 @@ export const syncIncrementalForAccount = async ({
     console.log("[gmail] Upserted message", {
       emailAddress,
       threadId: emailPayload?.threadId,
-      upserted: result?.upsertedId ? true : false,
+      emailId: result?._id,
     });
 
     indexGmailMessageEmbeddings({
@@ -496,4 +520,9 @@ export const syncIncrementalForAccount = async ({
     emailAddress,
     latestHistoryId,
   });
+  return {
+    userId: account.userId?.toString(),
+    account: account.email,
+    changed: true,
+  };
 };
