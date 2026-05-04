@@ -22,12 +22,18 @@ export const getThreadKey = (email) => {
   return `${account}::${threadId}`;
 };
 
+export const getEmailIdentity = (email) => {
+  if (!email) return "";
+  if (email.account && email.threadId) return getThreadKey(email);
+  return getEmailSignature(email);
+};
+
 export const mergeEmails = (list, incoming) => {
   const seen = new Set();
   const merged = [];
 
   for (const email of [incoming, ...list]) {
-    const key = getEmailSignature(email);
+    const key = getEmailIdentity(email);
     if (seen.has(key)) continue;
     seen.add(key);
     merged.push(email);
@@ -39,7 +45,7 @@ export const mergeEmails = (list, incoming) => {
 export const dedupeEmails = (emails) => {
   const seen = new Set();
   return emails.filter((email) => {
-    const key = getEmailSignature(email);
+    const key = getEmailIdentity(email);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

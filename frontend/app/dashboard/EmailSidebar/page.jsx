@@ -22,6 +22,7 @@ import {
   mergeEmails,
   sortEmails,
   getEmailSignature,
+  getEmailIdentity,
   getThreadKey,
 } from "./emailUtils";
 import { matchesFilters } from "./filterUtils";
@@ -153,6 +154,7 @@ const EmailSidebar = () => {
   const fetchSeqRef = useRef(0);
   const fetchAbortRef = useRef(null);
   const selectedThreadRef = useRef(null);
+  const messagesRef = useRef([]);
   const newTagMapRef = useRef(new Map());
   const searchQueryRef = useRef("");
 
@@ -178,6 +180,10 @@ const EmailSidebar = () => {
   useEffect(() => {
     selectedThreadRef.current = selectedThread;
   }, [selectedThread]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     searchQueryRef.current = searchQuery;
@@ -786,18 +792,17 @@ const EmailSidebar = () => {
   };
 
   useEffect(() => {
-    // Socket connection
-    socket.on("connect", () => {
+    const handleConnect = () => {
       console.log("Connected to socket:", socket.id);
-    });
+    };
 
-    socket.on("disconnect", () => {
+    const handleDisconnect = () => {
       console.log("Socket disconnected");
-    });
+    };
 
-    socket.on("sync-start", () => {
+    const handleSyncStart = () => {
       setSyncing(true);
-    });
+    };
 
     const handleEmbeddingStart = (payload = {}) => {
       setEmbeddingActiveCount((prev) => prev + 1);
@@ -835,11 +840,8 @@ const EmailSidebar = () => {
       }));
     };
 
-    socket.on("embedding-start", handleEmbeddingStart);
-    socket.on("embedding-complete", handleEmbeddingComplete);
-    socket.on("embedding-error", handleEmbeddingError);
-
-    socket.on("email-added", (email) => {
+    const handleEmailAdded = (email) => {
+      if (!email) return;
       if (searchQueryRef.current) {
         return;
       }
@@ -854,9 +856,20 @@ const EmailSidebar = () => {
         markNewTag(email);
       }
 
+      const incomingKey = getEmailIdentity(email);
+      const alreadyVisible = messagesRef.current.some(
+        (item) => getEmailIdentity(item) === incomingKey
+      );
+      const shouldIncrementTotal =
+        typeof email?.isNewThread === "boolean"
+          ? email.isNewThread
+          : !alreadyVisible;
+
       if (pageRef.current !== 1) {
         setNewMailCount((prev) => prev + 1);
-        setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
+        if (shouldIncrementTotal) {
+          setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
+        }
         return;
       }
 
@@ -878,7 +891,9 @@ const EmailSidebar = () => {
         );
       });
 
-      setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
+      if (shouldIncrementTotal) {
+        setTotal((prev) => (typeof prev === "number" ? prev + 1 : prev));
+      }
 
       const activeThread = selectedThreadRef.current;
       if (
@@ -888,35 +903,45 @@ const EmailSidebar = () => {
       ) {
         fetchThreadDetails(activeThread);
       }
-    });
+    };
 
-    socket.on("sync-complete", () => {
+    const handleSyncComplete = () => {
       setSyncing(false);
       if (pageRef.current === 1) {
         fetchMessages({ resetNew: true });
       }
       fetchTagCounts();
-    });
+    };
 
-    socket.on("email-updated", (update) => {
+    const handleEmailUpdated = (update) => {
       if (!update?.threadId || !update?.account) return;
       const thread = {
         threadId: update.threadId,
         account: update.account,
       };
       updateThreadUnread(thread, Boolean(update.isUnread));
-    });
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("sync-start", handleSyncStart);
+    socket.on("embedding-start", handleEmbeddingStart);
+    socket.on("embedding-complete", handleEmbeddingComplete);
+    socket.on("embedding-error", handleEmbeddingError);
+    socket.on("email-added", handleEmailAdded);
+    socket.on("sync-complete", handleSyncComplete);
+    socket.on("email-updated", handleEmailUpdated);
 
     return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("sync-start");
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("sync-start", handleSyncStart);
       socket.off("embedding-start", handleEmbeddingStart);
       socket.off("embedding-complete", handleEmbeddingComplete);
       socket.off("embedding-error", handleEmbeddingError);
-      socket.off("email-added");
-      socket.off("sync-complete");
-      socket.off("email-updated");
+      socket.off("email-added", handleEmailAdded);
+      socket.off("sync-complete", handleSyncComplete);
+      socket.off("email-updated", handleEmailUpdated);
     };
   }, []);
 
