@@ -1,7 +1,7 @@
 import EmailAccount from "../models/EmailAccount.js";
 import { enqueueIncrementalSync } from "../queues/incrementalSync.js";
 
-const DEFAULT_POLL_MS = 115_000;
+const DEFAULT_POLL_MS = 15_000;
 
 /**
  * Local/ngrok Pub/Sub delivery is unreliable: Gmail can publish while the push
