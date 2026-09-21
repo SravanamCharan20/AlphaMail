@@ -1,11 +1,15 @@
 import express from "express";
 import userAuth from "../middlewares/auth.js";
 import { emailQueue } from "../queues/emailQueue.js";
+import { enqueueIncrementalSync } from "../queues/incrementalSync.js";
 import Email from "../models/Email.js";
 import EmailEmbedding from "../models/EmailEmbedding.js";
 import EmailAccount from "../models/EmailAccount.js";
 import mongoose from "mongoose";
-import { verifyPubSubJwt } from "../services/pubsubAuth.js";
+import {
+  shouldRequirePubSubAuth,
+  verifyPubSubJwt,
+} from "../services/pubsubAuth.js";
 import { createGmailClient } from "../services/gmailClient.js";
 import { publishSocketEvent } from "../services/socketPubSub.js";
 import {
@@ -111,20 +115,31 @@ function getDateRangeBounds(range, tzOffsetMinutes = 0) {
   return null;
 }
 
-const enqueueIncrementalSync = async ({ emailAddress, historyId }) => {
-  await emailQueue.add("incremental-sync", {
-    emailAddress,
-    historyId: String(historyId),
-  });
-};
-
 gmailRouter.post("/push", async (req, res) => {
   try {
     const audience = process.env.PUBSUB_PUSH_AUDIENCE;
     const serviceAccount = process.env.PUBSUB_PUSH_SERVICE_ACCOUNT;
-    console.log("[pubsub] Push received");
-    await verifyPubSubJwt(req.headers.authorization, audience, serviceAccount);
-    console.log("[pubsub] JWT verified");
+    const authHeader = req.headers.authorization;
+    const requireAuth = shouldRequirePubSubAuth();
+
+    console.log("[pubsub] Push received", {
+      hasAuthorization: Boolean(authHeader),
+      requireAuth,
+    });
+
+    // Google push subscriptions without OIDC omit Authorization entirely.
+    // That was rejecting every local/ngrok notification before enqueue.
+    if (authHeader) {
+      await verifyPubSubJwt(authHeader, audience, serviceAccount);
+      console.log("[pubsub] JWT verified");
+    } else if (requireAuth) {
+      throw new Error("Missing Authorization header");
+    } else {
+      console.warn(
+        "[pubsub] No Authorization header — accepting push without JWT (non-production). " +
+          "Enable OIDC on the push subscription or set PUBSUB_REQUIRE_AUTH=true for stricter local auth."
+      );
+    }
 
     const message = req.body?.message;
     if (!message?.data) {
@@ -219,6 +234,10 @@ gmailRouter.get("/push/debug", userAuth, async (req, res) => {
         hasPushServiceAccount: Boolean(process.env.PUBSUB_PUSH_SERVICE_ACCOUNT),
         pushServiceAccount: process.env.PUBSUB_PUSH_SERVICE_ACCOUNT || null,
         pubSubLabels: process.env.PUBSUB_LABELS || "INBOX",
+        requirePushAuth: shouldRequirePubSubAuth(),
+        allowUnauthenticatedPush:
+          process.env.PUBSUB_ALLOW_UNAUTHENTICATED_PUSH === "true",
+        nodeEnv: process.env.NODE_ENV || null,
       },
       accounts: accounts.map((account) => ({
         ...account,

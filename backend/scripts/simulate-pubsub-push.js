@@ -1,7 +1,11 @@
 import dotenv from "dotenv";
-import { emailQueue } from "../queues/emailQueue.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import { enqueueIncrementalSync } from "../queues/incrementalSync.js";
 
-dotenv.config();
+dotenv.config({
+  path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.env"),
+});
 
 const emailAddress = process.argv[2];
 const historyId = process.argv[3] || String(Date.now());
@@ -13,9 +17,10 @@ if (!emailAddress) {
   process.exit(1);
 }
 
-await emailQueue.add("incremental-sync", {
+await enqueueIncrementalSync({
   emailAddress,
   historyId,
+  source: "push",
 });
 
 console.log("Enqueued incremental-sync", { emailAddress, historyId });

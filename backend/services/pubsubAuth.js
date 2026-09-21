@@ -4,6 +4,23 @@ const authClient = new google.auth.OAuth2();
 
 const normalizeAudience = (value = "") => String(value || "").trim().replace(/\/+$/, "");
 
+/**
+ * Production always requires a verified OIDC bearer token.
+ * Local/ngrok push subscriptions often omit auth; allow that only when:
+ * - NODE_ENV is not production, and
+ * - PUBSUB_REQUIRE_AUTH is not "true"
+ * Or when PUBSUB_ALLOW_UNAUTHENTICATED_PUSH=true.
+ */
+export const shouldRequirePubSubAuth = () => {
+  if (process.env.PUBSUB_ALLOW_UNAUTHENTICATED_PUSH === "true") {
+    return false;
+  }
+  if (process.env.PUBSUB_REQUIRE_AUTH === "true") {
+    return true;
+  }
+  return process.env.NODE_ENV === "production";
+};
+
 export const verifyPubSubJwt = async (
   authHeader,
   audience,

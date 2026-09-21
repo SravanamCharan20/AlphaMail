@@ -794,6 +794,11 @@ const EmailSidebar = () => {
   useEffect(() => {
     const handleConnect = () => {
       console.log("Connected to socket:", socket.id);
+      // Catch up any mail missed while the socket was down / Pub/Sub lagged.
+      if (pageRef.current === 1 && !searchQueryRef.current) {
+        fetchMessages({ resetNew: false });
+      }
+      fetchTagCounts();
     };
 
     const handleDisconnect = () => {
@@ -905,8 +910,12 @@ const EmailSidebar = () => {
       }
     };
 
-    const handleSyncComplete = () => {
+    const handleSyncComplete = (payload = {}) => {
       setSyncing(false);
+      // Poller emits sync-complete only when something changed; still guard here.
+      if (payload?.incremental && payload?.changed === false) {
+        return;
+      }
       if (pageRef.current === 1) {
         fetchMessages({ resetNew: true });
       }

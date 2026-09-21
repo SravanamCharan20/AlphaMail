@@ -1,5 +1,10 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import IORedis from "ioredis";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const DEFAULT_REDIS_HOST = "127.0.0.1";
 const DEFAULT_REDIS_PORT = 6379;

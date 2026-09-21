@@ -383,6 +383,7 @@ const syncIncrementalForSingleAccount = async (account, historyId) => {
   }
 
   let historyResponse;
+  const historyRecords = [];
   try {
     const historyParams = {
       userId: "me",
@@ -397,7 +398,48 @@ const syncIncrementalForSingleAccount = async (account, historyId) => {
       historyParams.labelId = activeAccount.watchLabels[0];
     }
 
-    historyResponse = await gmail.users.history.list(historyParams);
+    // Gmail may notify before history is queryable. Retry empty pages briefly.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      historyRecords.length = 0;
+      let pageToken = undefined;
+      do {
+        historyResponse = await gmail.users.history.list({
+          ...historyParams,
+          pageToken,
+        });
+        const pageRecords = historyResponse?.data?.history || [];
+        historyRecords.push(...pageRecords);
+        pageToken = historyResponse?.data?.nextPageToken || undefined;
+      } while (pageToken);
+
+      if (historyRecords.length > 0) break;
+
+      const notifiedHistoryId = String(historyId || "");
+      const latestSeen = String(
+        historyResponse?.data?.historyId || startHistoryId || ""
+      );
+      let shouldRetry = false;
+      try {
+        shouldRetry =
+          Boolean(notifiedHistoryId) &&
+          Boolean(startHistoryId) &&
+          BigInt(notifiedHistoryId) > BigInt(startHistoryId);
+      } catch {
+        shouldRetry = notifiedHistoryId !== startHistoryId;
+      }
+
+      if (!shouldRetry || attempt === maxAttempts) break;
+
+      console.log("[gmail] Empty history after notify — retrying", {
+        emailAddress,
+        attempt,
+        startHistoryId,
+        notifiedHistoryId,
+        latestSeen,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
+    }
   } catch (error) {
     const status = error?.code || error?.response?.status;
     if (status === 404) {
@@ -419,8 +461,7 @@ const syncIncrementalForSingleAccount = async (account, historyId) => {
     throw error;
   }
 
-  const historyRecords = historyResponse?.data?.history || [];
-  const messageIds = new Set(); // contains all the new historyids from presnt to new
+  const messageIds = new Set(); // newly added message ids from history
   const threadReadUpdates = new Map();
 
   historyRecords.forEach((record) => {
@@ -455,6 +496,7 @@ const syncIncrementalForSingleAccount = async (account, historyId) => {
   console.log("[gmail] History records", {
     emailAddress,
     count: historyRecords.length,
+    messageIds: messageIds.size,
     latestHistoryId,
   });
 
@@ -471,15 +513,31 @@ const syncIncrementalForSingleAccount = async (account, historyId) => {
     };
   }
 
-  const messageDetails = await Promise.all(
-    [...messageIds].map((id) =>
-      gmail.users.messages.get({
-        userId: "me",
-        id,
-        format: "full",
+  const MESSAGE_FETCH_CONCURRENCY = 5;
+  const ids = [...messageIds];
+  const messageDetails = [];
+  for (let i = 0; i < ids.length; i += MESSAGE_FETCH_CONCURRENCY) {
+    const chunk = ids.slice(i, i + MESSAGE_FETCH_CONCURRENCY);
+    const chunkResults = await Promise.all(
+      chunk.map(async (id) => {
+        try {
+          return await gmail.users.messages.get({
+            userId: "me",
+            id,
+            format: "full",
+          });
+        } catch (error) {
+          console.warn("[gmail] Failed to fetch message", {
+            emailAddress,
+            messageId: id,
+            error: error?.message || String(error),
+          });
+          return null;
+        }
       })
-    )
-  );
+    );
+    messageDetails.push(...chunkResults.filter(Boolean));
+  }
 
   for (const messageData of messageDetails) {
     const message = messageData?.data;
@@ -554,37 +612,65 @@ export const syncIncrementalForAccount = async ({
   emailAddress,
   historyId,
 }) => {
-  console.log("[gmail] Incremental sync start", { emailAddress, historyId });
-
-  const accounts = await EmailAccount.find({ email: emailAddress }).sort({
-    updatedAt: -1,
+  const normalizedEmail = String(emailAddress || "").trim().toLowerCase();
+  console.log("[gmail] Incremental sync start", {
+    emailAddress: normalizedEmail,
+    historyId,
   });
+
+  // Case-insensitive match; same Gmail can be linked to multiple AlphaMail users.
+  const accounts = await EmailAccount.find({
+    email: {
+      $regex: `^${normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      $options: "i",
+    },
+  }).sort({ updatedAt: -1 });
+
   if (!accounts.length) {
-    console.warn("[gmail] No account for email", emailAddress);
+    console.warn("[gmail] No account for email", normalizedEmail);
     return null;
   }
 
   const results = [];
   for (const account of accounts) {
     try {
+      // Skip obviously dead connections (expired watch + stale update) to avoid
+      // invalid_grant noise after re-connect on another user/session.
+      const watchExpired =
+        !account.watchExpiration ||
+        account.watchExpiration.getTime() <= Date.now();
+      const staleMs = Date.now() - new Date(account.updatedAt || 0).getTime();
+      const isStaleDuplicate =
+        watchExpired && staleMs > 7 * 24 * 60 * 60 * 1000;
+
+      if (isStaleDuplicate) {
+        console.warn("[gmail] Skipping stale account connection", {
+          emailAddress: normalizedEmail,
+          userId: account.userId?.toString(),
+          watchExpiration: account.watchExpiration,
+          updatedAt: account.updatedAt,
+        });
+        continue;
+      }
+
       const result = await syncIncrementalForSingleAccount(account, historyId);
       if (!result) continue;
       results.push(result);
-      if (result.userId) {
+      if (result.userId && result.changed) {
         await publishSocketEvent(
           "sync-complete",
           {
             userId: result.userId,
             incremental: true,
             account: result.account || null,
-            changed: Boolean(result.changed),
+            changed: true,
           },
           result.userId
         );
       }
     } catch (error) {
       console.error("[gmail] Incremental sync failed for account", {
-        emailAddress,
+        emailAddress: normalizedEmail,
         userId: account.userId?.toString(),
         error: error?.message || error,
       });

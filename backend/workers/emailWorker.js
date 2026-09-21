@@ -6,11 +6,15 @@ import {
 import { connectDB } from "../config/db.js";
 import { publishSocketEvent } from "../services/socketPubSub.js";
 import { createRedisConnection } from "../config/redis.js";
+import { startIncrementalPoller } from "../services/incrementalPoller.js";
 
 const redisConnection = createRedisConnection();
 
 await connectDB();
 console.log("Worker Started...");
+
+startIncrementalPoller();
+
 const worker = new Worker(
   "initial-sync",
   async (job) => {
@@ -23,6 +27,12 @@ const worker = new Worker(
     }
 
     if (job.name === "incremental-sync") {
+      console.log("[worker] Incremental job", {
+        id: job.id,
+        emailAddress: job.data?.emailAddress,
+        historyId: job.data?.historyId,
+        source: job.data?.source || "push",
+      });
       await syncIncrementalForAccount(job.data);
       return;
     }
@@ -31,6 +41,7 @@ const worker = new Worker(
   },
   {
     connection: redisConnection,
+    concurrency: 1,
   }
 );
 
@@ -39,5 +50,5 @@ worker.on("completed", (job) => {
 });
 
 worker.on("failed", (job, err) => {
-  console.log("Job failed:", err);
+  console.log("Job failed:", job?.id, err);
 });
