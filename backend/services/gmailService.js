@@ -333,32 +333,51 @@ export const refreshMailboxWatchForUser = async (userId, accountEmail = null) =>
   };
 };
 
-export const syncIncrementalForAccount = async ({
-  emailAddress,
-  historyId,
-}) => {
-  console.log("[gmail] Incremental sync start", { emailAddress, historyId });
-  const account = await EmailAccount.findOne({ email: emailAddress });
-  if (!account) {
-    console.warn("[gmail] No account for email", emailAddress);
-    return null;
+const isWatchExpired = (account) => {
+  if (!account?.watchExpiration) return true;
+  return account.watchExpiration.getTime() <= Date.now();
+};
+
+const ensureMailboxWatch = async (account) => {
+  if (!isWatchExpired(account)) return account;
+  console.warn("[gmail] Watch expired or missing, renewing", {
+    account: account.email,
+    watchExpiration: account.watchExpiration,
+  });
+  try {
+    await watchMailboxForAccount(account);
+    return EmailAccount.findById(account._id);
+  } catch (error) {
+    console.warn("[gmail] Watch renewal failed, continuing with existing tokens", {
+      account: account.email,
+      error: error?.message || error,
+    });
+    return account;
+  }
+};
+
+const syncIncrementalForSingleAccount = async (account, historyId) => {
+  const emailAddress = account.email;
+  const activeAccount = await ensureMailboxWatch(account);
+  if (!activeAccount) {
+    return { userId: account.userId?.toString(), account: emailAddress, changed: false };
   }
 
-  const gmail = createGmailClient(account);
+  const gmail = createGmailClient(activeAccount);
 
-  const startHistoryId = account.lastHistoryId;
+  const startHistoryId = activeAccount.lastHistoryId;
   if (!startHistoryId) {
     console.warn("[gmail] Missing lastHistoryId, falling back to full sync", {
       emailAddress,
     });
-    await syncUserEmails(account.userId);
+    await syncUserEmails(activeAccount.userId);
     await EmailAccount.updateOne(
-      { _id: account._id },
+      { _id: activeAccount._id },
       { lastHistoryId: historyId }
     );
     return {
-      userId: account.userId?.toString(),
-      account: account.email,
+      userId: activeAccount.userId?.toString(),
+      account: activeAccount.email,
       changed: true,
     };
   }
@@ -372,10 +391,10 @@ export const syncIncrementalForAccount = async ({
     };
 
     if (
-      Array.isArray(account.watchLabels) &&
-      account.watchLabels.length === 1
+      Array.isArray(activeAccount.watchLabels) &&
+      activeAccount.watchLabels.length === 1
     ) {
-      historyParams.labelId = account.watchLabels[0];
+      historyParams.labelId = activeAccount.watchLabels[0];
     }
 
     historyResponse = await gmail.users.history.list(historyParams);
@@ -386,14 +405,14 @@ export const syncIncrementalForAccount = async ({
         emailAddress,
         historyId,
       });
-      await syncUserEmails(account.userId);
+      await syncUserEmails(activeAccount.userId);
       await EmailAccount.updateOne(
-        { _id: account._id },
+        { _id: activeAccount._id },
         { lastHistoryId: historyId }
       );
       return {
-        userId: account.userId?.toString(),
-        account: account.email,
+        userId: activeAccount.userId?.toString(),
+        account: activeAccount.email,
         changed: true,
       };
     }
@@ -401,7 +420,7 @@ export const syncIncrementalForAccount = async ({
   }
 
   const historyRecords = historyResponse?.data?.history || [];
-  const messageIds = new Set();
+  const messageIds = new Set(); // contains all the new historyids from presnt to new
   const threadReadUpdates = new Map();
 
   historyRecords.forEach((record) => {
@@ -442,12 +461,12 @@ export const syncIncrementalForAccount = async ({
   if (messageIds.size === 0 && threadReadUpdates.size === 0) {
     console.log("[gmail] No new messages", { emailAddress });
     await EmailAccount.updateOne(
-      { _id: account._id },
+      { _id: activeAccount._id },
       { lastHistoryId: latestHistoryId }
     );
     return {
-      userId: account.userId?.toString(),
-      account: account.email,
+      userId: activeAccount.userId?.toString(),
+      account: activeAccount.email,
       changed: false,
     };
   }
@@ -469,8 +488,8 @@ export const syncIncrementalForAccount = async ({
     const emailPayload = buildEmailPayloadFromMessage(message);
 
     const result = await upsertEmailAndPublish({
-      userId: account.userId,
-      accountEmail: account.email,
+      userId: activeAccount.userId,
+      accountEmail: activeAccount.email,
       emailPayload,
       syncSource: "incremental",
       isIncremental: true,
@@ -482,8 +501,8 @@ export const syncIncrementalForAccount = async ({
     });
 
     indexGmailMessageEmbeddings({
-      userId: account.userId,
-      account: account.email,
+      userId: activeAccount.userId,
+      account: activeAccount.email,
       message,
       tags: emailPayload?.tags || [],
       spamCategory: emailPayload?.spamCategory || null,
@@ -498,22 +517,26 @@ export const syncIncrementalForAccount = async ({
 
   for (const [threadId, isUnread] of threadReadUpdates.entries()) {
     await Email.updateOne(
-      { userId: account.userId, account: account.email, threadId },
+      {
+        userId: activeAccount.userId,
+        account: activeAccount.email,
+        threadId,
+      },
       { isUnread }
     );
     await publishSocketEvent(
       "email-updated",
       {
-        account: account.email,
+        account: activeAccount.email,
         threadId,
         isUnread,
       },
-      account.userId.toString()
+      activeAccount.userId.toString()
     );
   }
 
   await EmailAccount.updateOne(
-    { _id: account._id },
+    { _id: activeAccount._id },
     { lastHistoryId: latestHistoryId }
   );
   console.log("[gmail] Incremental sync complete", {
@@ -521,8 +544,61 @@ export const syncIncrementalForAccount = async ({
     latestHistoryId,
   });
   return {
-    userId: account.userId?.toString(),
-    account: account.email,
+    userId: activeAccount.userId?.toString(),
+    account: activeAccount.email,
     changed: true,
+  };
+};
+
+export const syncIncrementalForAccount = async ({
+  emailAddress,
+  historyId,
+}) => {
+  console.log("[gmail] Incremental sync start", { emailAddress, historyId });
+
+  const accounts = await EmailAccount.find({ email: emailAddress }).sort({
+    updatedAt: -1,
+  });
+  if (!accounts.length) {
+    console.warn("[gmail] No account for email", emailAddress);
+    return null;
+  }
+
+  const results = [];
+  for (const account of accounts) {
+    try {
+      const result = await syncIncrementalForSingleAccount(account, historyId);
+      if (!result) continue;
+      results.push(result);
+      if (result.userId) {
+        await publishSocketEvent(
+          "sync-complete",
+          {
+            userId: result.userId,
+            incremental: true,
+            account: result.account || null,
+            changed: Boolean(result.changed),
+          },
+          result.userId
+        );
+      }
+    } catch (error) {
+      console.error("[gmail] Incremental sync failed for account", {
+        emailAddress,
+        userId: account.userId?.toString(),
+        error: error?.message || error,
+      });
+    }
+  }
+
+  if (!results.length) return null;
+
+  const changed = results.some((result) => result.changed);
+  const primary = results[0];
+  return {
+    ...primary,
+    changed,
+    syncedAccounts: results.length,
+    results,
   };
 };

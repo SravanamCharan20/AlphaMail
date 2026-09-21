@@ -111,6 +111,13 @@ function getDateRangeBounds(range, tzOffsetMinutes = 0) {
   return null;
 }
 
+const enqueueIncrementalSync = async ({ emailAddress, historyId }) => {
+  await emailQueue.add("incremental-sync", {
+    emailAddress,
+    historyId: String(historyId),
+  });
+};
+
 gmailRouter.post("/push", async (req, res) => {
   try {
     const audience = process.env.PUBSUB_PUSH_AUDIENCE;
@@ -147,16 +154,51 @@ gmailRouter.post("/push", async (req, res) => {
       emailAddress,
       historyId,
     });
-    await emailQueue.add("incremental-sync", {
-      emailAddress,
-      historyId,
-    });
+    await enqueueIncrementalSync({ emailAddress, historyId });
 
     return res.status(204).send();
   } catch (error) {
     console.error("[pubsub] Push failed", error?.message || error);
-    const status = error?.message?.includes("Authorization") ? 401 : 500;
-    return res.status(status).json({ message: "Pub/Sub push failed" });
+    const isAuthError =
+      error?.message?.includes("Authorization") ||
+      error?.message?.includes("Wrong recipient") ||
+      error?.message?.includes("Unexpected service account") ||
+      error?.message?.includes("Invalid token");
+    const status = isAuthError ? 401 : 500;
+    return res.status(status).json({
+      message: "Pub/Sub push failed",
+      ...(process.env.NODE_ENV !== "production" && {
+        details: error?.message || String(error),
+      }),
+    });
+  }
+});
+
+// Local dev helper: bypass Pub/Sub JWT when testing incremental sync.
+gmailRouter.post("/push/simulate", userAuth, async (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({ message: "Not found" });
+  }
+
+  try {
+    const emailAddress = String(
+      req.body?.emailAddress || req.body?.account || ""
+    ).trim();
+    const historyId = String(req.body?.historyId || Date.now()).trim();
+
+    if (!emailAddress) {
+      return res.status(400).json({ message: "emailAddress is required" });
+    }
+
+    await enqueueIncrementalSync({ emailAddress, historyId });
+    return res.status(200).json({
+      message: "Incremental sync enqueued",
+      emailAddress,
+      historyId,
+    });
+  } catch (error) {
+    console.error("[pubsub] Simulate push failed", error?.message || error);
+    return res.status(500).json({ message: "Failed to simulate Pub/Sub push" });
   }
 });
 

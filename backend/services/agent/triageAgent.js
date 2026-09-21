@@ -159,7 +159,7 @@ export const runTriageAgent = async ({
       break;
     }
 
-    contents.push(response.candidates[0].content);
+    contents.push(response.candidates[0].content);// Gemini's tool request
 
     for (const requestedCall of requestedCalls) {
       const executed = await executeToolCall({

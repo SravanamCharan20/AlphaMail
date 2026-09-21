@@ -1,10 +1,15 @@
 import { spawn } from "child_process";
+import { existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import readline from "readline";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.resolve(__dirname, "../workers/embedding_worker.py");
+const VENV_PYTHON = path.resolve(__dirname, "../.venv/bin/python3");
+const PYTHON_BIN =
+  process.env.EMBEDDING_PYTHON ||
+  (existsSync(VENV_PYTHON) ? VENV_PYTHON : "python3");
 
 let workerProcess = null;
 let workerInterface = null;
@@ -14,7 +19,7 @@ let workerUnavailableError = null;
 const startWorker = () => {
   if (workerProcess || workerUnavailableError) return;
 
-  workerProcess = spawn("python3", [WORKER_PATH, "--server"], {
+  workerProcess = spawn(PYTHON_BIN, [WORKER_PATH, "--server"], {
     stdio: ["pipe", "pipe", "pipe"],
   });
 

@@ -23,19 +23,7 @@ const worker = new Worker(
     }
 
     if (job.name === "incremental-sync") {
-      const result = await syncIncrementalForAccount(job.data);
-      if (result?.userId) {
-        await publishSocketEvent(
-          "sync-complete",
-          {
-            userId: result.userId,
-            incremental: true,
-            account: result.account || null,
-            changed: Boolean(result.changed),
-          },
-          result.userId
-        );
-      }
+      await syncIncrementalForAccount(job.data);
       return;
     }
 
