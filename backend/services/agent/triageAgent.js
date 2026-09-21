@@ -1,14 +1,21 @@
 import {
   getGeminiClient,
   getGeminiConfigStatus,
-  getGeminiModel,
+  getGeminiTriageModel,
 } from "./geminiClient.js";
 import { triageTools } from "./toolRegistry.js";
 import { toolHandlers } from "./toolHandlers.js";
 
-const MAX_STEPS = 5;
+// Each agent step is a network round trip. Three steps allow a tool request,
+// a follow-up lookup, and a final answer without leaving the UI waiting on an
+// unbounded chain of model calls.
+const MAX_STEPS = 3;
 const RETRYABLE_GEMINI_STATUSES = new Set([429, 500, 503]);
 const RETRY_DELAY_MS = 1200;
+// Fail over before the UI feels stalled. A healthy Flash request normally
+// completes in a few seconds; the next fast model gets a chance at 8 seconds.
+const GEMINI_STEP_TIMEOUT_MS = 8_000;
+const TOOL_TIMEOUT_MS = 12_000;
 
 const SYSTEM_PROMPT = `
 You are AlphaMail, an inbox triage assistant.
@@ -53,6 +60,8 @@ const buildToolConfig = () => ({
     },
   ],
   systemInstruction: SYSTEM_PROMPT,
+  maxOutputTokens: 450,
+  temperature: 0.2,
 });
 
 const executeToolCall = async ({ userId, toolCall }) => {
@@ -72,12 +81,34 @@ const executeToolCall = async ({ userId, toolCall }) => {
   };
 };
 
+const withTimeout = async (promise, timeoutMs, label) => {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error(`${label} timed out after ${timeoutMs / 1000}s`)),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getModelCandidates = () => {
-  const preferredModel = getGeminiModel();
-  return [...new Set([preferredModel, "gemini-2.5-flash-lite"])];
+  const triageModel = getGeminiTriageModel();
+  return [...new Set([triageModel, "gemini-2.5-flash"])];
 };
+
+const isRetryableGeminiError = (error) =>
+  RETRYABLE_GEMINI_STATUSES.has(Number(error?.status)) ||
+  error?.name === "AbortError" ||
+  /timeout|timed out|aborted/i.test(String(error?.message || ""));
 
 const generateAgentStep = async ({ gemini, contents }) => {
   const modelCandidates = getModelCandidates();
@@ -85,17 +116,27 @@ const generateAgentStep = async ({ gemini, contents }) => {
 
   for (const model of modelCandidates) {
     try {
+      const config = buildToolConfig();
+      // Triage is a retrieval-and-summary task. Disabling thinking on Gemini
+      // 2.5 avoids spending extra latency on reasoning tokens before tools run.
+      if (model.includes("flash")) {
+        config.thinkingConfig = { thinkingBudget: 0 };
+      }
+
       const response = await gemini.models.generateContent({
         model,
         contents,
-        config: buildToolConfig(),
+        config: {
+          ...config,
+          abortSignal: AbortSignal.timeout(GEMINI_STEP_TIMEOUT_MS),
+        },
       });
 
       return { response, model };
     } catch (error) {
       lastError = error;
       const shouldRetry =
-        RETRYABLE_GEMINI_STATUSES.has(Number(error?.status)) &&
+        isRetryableGeminiError(error) &&
         model !== modelCandidates[modelCandidates.length - 1];
 
       if (shouldRetry) {
@@ -138,6 +179,7 @@ export const runTriageAgent = async ({
   const toolCalls = [];
   let stepsUsed = 0;
   let finalAnswer = "";
+  const startedAt = Date.now();
 
   while (stepsUsed < MAX_STEPS) {
     stepsUsed += 1;
@@ -159,35 +201,54 @@ export const runTriageAgent = async ({
       break;
     }
 
-    contents.push(response.candidates[0].content);// Gemini's tool request
+    const modelContent = response.candidates?.[0]?.content;
+    if (!modelContent) {
+      throw new Error("Gemini returned tool calls without model content");
+    }
+    contents.push(modelContent);
 
-    for (const requestedCall of requestedCalls) {
-      const executed = await executeToolCall({
-        userId,
-        toolCall: requestedCall,
-      });
+    // Gemini may request independent lookups together. Running them serially
+    // turns one model step into several slow database/Gmail operations.
+    const executedCalls = await Promise.all(
+      requestedCalls.map(async (requestedCall) => {
+        try {
+          return await withTimeout(
+            executeToolCall({ userId, toolCall: requestedCall }),
+            TOOL_TIMEOUT_MS,
+            `Tool ${requestedCall?.name || "request"}`
+          );
+        } catch (error) {
+          return {
+            name: requestedCall?.name || "unknown",
+            id: requestedCall?.id,
+            args: requestedCall?.args || {},
+            result: {
+              error: error?.message || "Tool request failed",
+            },
+          };
+        }
+      })
+    );
 
+    executedCalls.forEach((executed) => {
       toolCalls.push({
         step: stepsUsed,
         name: executed.name,
         args: executed.args,
       });
+    });
 
-      contents.push({
-        role: "user",
-        parts: [
-          {
-            functionResponse: {
-              name: executed.name,
-              id: executed.id,
-              response: {
-                result: executed.result,
-              },
-            },
-          },
-        ],
-      });
-    }
+    // Function responses from the same model turn belong in one user message.
+    contents.push({
+      role: "user",
+      parts: executedCalls.map((executed) => ({
+        functionResponse: {
+          name: executed.name,
+          id: executed.id,
+          response: { result: executed.result },
+        },
+      })),
+    });
   }
 
   if (!finalAnswer) {
@@ -199,6 +260,7 @@ export const runTriageAgent = async ({
     answer: finalAnswer,
     stepsUsed,
     toolCalls,
+    durationMs: Date.now() - startedAt,
   };
 };
 

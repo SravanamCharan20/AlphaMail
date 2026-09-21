@@ -276,21 +276,30 @@ export const toolHandlers = {
     const tags = normalizeTags(args.tags);
 
     if (query) {
-      const semanticResults = await semanticSearchEmails({
-        userId,
-        query,
-        account,
-        range,
-        tags,
-        limit,
-      });
+      // Embeddings and Atlas vector indexes are optional operational
+      // dependencies. A problem there should not make the entire assistant
+      // unavailable when the indexed email summaries can still answer it.
+      try {
+        const semanticResults = await semanticSearchEmails({
+          userId,
+          query,
+          account,
+          range,
+          tags,
+          limit,
+        });
 
-      if (semanticResults.length) {
-        return {
-          mode: "semantic",
-          count: semanticResults.length,
-          results: semanticResults,
-        };
+        if (semanticResults.length) {
+          return {
+            mode: "semantic",
+            count: semanticResults.length,
+            results: semanticResults,
+          };
+        }
+      } catch (error) {
+        console.warn("[agent] semantic search unavailable; using Mongo fallback", {
+          message: error?.message || String(error),
+        });
       }
     }
 
